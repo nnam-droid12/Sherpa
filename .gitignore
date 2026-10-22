@@ -9,3 +9,7 @@ __pycache__/
 dist/
 build/
 coverage/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo

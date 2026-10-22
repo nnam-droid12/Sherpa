@@ -11,7 +11,7 @@ NAMES=(SHERPA_API_KEY KERNEL_API_KEY PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET PAYPA
 
 for name in "${NAMES[@]}"; do
   value="$(grep -E "^${name}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' || true)"
-  if [ -z "$value" ] || [[ "$value" == your-* ]] || [[ "$value" == *xxx ]] || [ "$value" = "change-me" ]; then
+  if [ -z "$value" ] || [[ "$value" == your-* ]] || [[ "$value" == *xxx ]] || [[ "$value" == *example.com ]] || [ "$value" = "change-me" ]; then
     echo "skip   $name (empty or placeholder)"
     continue
   fi

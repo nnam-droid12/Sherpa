@@ -382,7 +382,9 @@ async def run_shopper(
                         k: ("•••" if k == "text" and "paypal.com" in b.page.url else v)
                         for k, v in args.items()
                     }
-                    step = Step(n, call.name, safe_args, narration, b.page.url, probe, shot_id)
+                    # Gemini 3.x explains each action in an `intent` argument rather than in text.
+                    said = narration or str(args.get("intent", ""))
+                    step = Step(n, call.name, safe_args, said, b.page.url, probe, shot_id)
                     result.steps.append(step)
                     await emit(
                         "step",
@@ -390,7 +392,7 @@ async def run_shopper(
                         step=n,
                         action=call.name,
                         args=safe_args,
-                        narration=narration,
+                        narration=said,
                         url=b.page.url,
                         shot_id=shot_id,
                         paypal_visible=probe.get("paypal_visible", False),

@@ -12,7 +12,8 @@ TARGET="${1:-all}"
 gcloud config set project "$PROJECT" >/dev/null
 
 ensure_registry() {
-  gcloud artifacts repositories describe sherpa --location "$REGION" >/dev/null 2>&1 || \n    gcloud artifacts repositories create sherpa --repository-format docker --location "$REGION" --quiet
+  gcloud artifacts repositories describe sherpa --location "$REGION" >/dev/null 2>&1 ||
+    gcloud artifacts repositories create sherpa --repository-format docker --location "$REGION" --quiet
 }
 
 ensure_service_account() {

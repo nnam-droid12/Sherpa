@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     github_token: str = Field(default="", alias="GITHUB_TOKEN")
 
     cors_origins: str = Field(default="*", alias="SHERPA_CORS_ORIGINS")
+    firestore_db: str = Field(default="sherpa", alias="SHERPA_FIRESTORE_DB")
+    gcp_region: str = Field(default="us-east1", alias="GCP_REGION")
+    artifacts_bucket: str = Field(default="nixora-project-sherpa-artifacts", alias="SHERPA_ARTIFACTS_BUCKET")
+    demo_mode: bool = Field(default=True, alias="SHERPA_DEMO_MODE")
 
 
 class LiveModeError(RuntimeError):

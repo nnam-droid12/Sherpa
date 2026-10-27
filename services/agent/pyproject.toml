@@ -16,6 +16,8 @@ dependencies = [
   "playwright>=1.47",
   "kernel>=0.8",
   "tenacity>=9.0",
+  "google-cloud-storage>=2.18",
+  "pillow>=10.4",
 ]
 
 [project.optional-dependencies]

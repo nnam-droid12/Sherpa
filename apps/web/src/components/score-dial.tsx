@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-export function scoreTone(score: number) {
-  if (score >= 85) return "var(--good)";
-  if (score >= 60) return "var(--warn)";
-  return "var(--bad)";
-}
+import { scoreTone } from "@/lib/score";
 
 export function ScoreDial({
   score,

@@ -1,5 +1,5 @@
 import { CATEGORY_LABELS, type CategoryScore } from "@/lib/types";
-import { scoreTone } from "./score-dial";
+import { scoreTone } from "@/lib/score";
 
 export function CategoryBars({
   categories,

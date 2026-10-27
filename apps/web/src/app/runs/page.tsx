@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { scoreTone } from "@/components/score-dial";
+import { scoreTone } from "@/lib/score";
 import { agentGet } from "@/lib/agent";
 import type { Run } from "@/lib/types";
 

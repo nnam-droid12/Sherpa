@@ -40,14 +40,20 @@ secret_flags() {
   echo "${flags%,}"
 }
 
+url_of() {
+  gcloud run services describe "$1" --region "$REGION" --format 'value(status.url)' 2>/dev/null || true
+}
+
 deploy_agent() {
-  local secrets
+  local secrets demo_env
+  demo_env="DEMO_EMBER_OAK_URL=$(url_of store-ember-oak),DEMO_LUMEN_URL=$(url_of store-lumen-bakehouse)"
+  demo_env+=",SHERPA_PUBLIC_URL=$(url_of sherpa-agent)"
   secrets="$(secret_flags SHERPA_API_KEY KERNEL_API_KEY PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET \
     PAYPAL_WEBHOOK_ID PAYPAL_SANDBOX_BUYER_EMAIL PAYPAL_SANDBOX_BUYER_PASSWORD GITHUB_TOKEN)"
   gcloud run deploy sherpa-agent --source "$ROOT/services/agent" --region "$REGION" \
     --service-account "$SA" --allow-unauthenticated --memory 2Gi --cpu 2 --timeout 3600 \
     --concurrency 20 --min-instances 0 --max-instances 3 --no-cpu-throttling \
-    --set-env-vars "SHERPA_ENV=cloud,GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global},GCP_REGION=$REGION" \
+    --set-env-vars "SHERPA_ENV=cloud,GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global},GCP_REGION=$REGION,$demo_env" \
     ${secrets:+--set-secrets "$secrets"} --quiet
 }
 
@@ -79,6 +85,13 @@ case "$TARGET" in
   agent) deploy_agent ;;
   web) deploy_web ;;
   stores) deploy_stores ;;
-  all) deploy_agent; deploy_web; deploy_stores ;;
+  all)
+    deploy_stores
+    deploy_agent
+    # The agent's own URL is only known after its first deploy, so refresh it afterwards.
+    gcloud run services update sherpa-agent --region "$REGION" \
+      --update-env-vars "SHERPA_PUBLIC_URL=$(url_of sherpa-agent)" --quiet >/dev/null
+    deploy_web
+    ;;
   *) echo "unknown target $TARGET" >&2; exit 1 ;;
 esac

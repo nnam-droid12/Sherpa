@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     demo_ember_oak_url: str = Field(default="", alias="DEMO_EMBER_OAK_URL")
     demo_lumen_url: str = Field(default="", alias="DEMO_LUMEN_URL")
     demo_repo_owner: str = Field(default="nnam-droid12", alias="DEMO_REPO_OWNER")
+    public_url: str = Field(default="http://localhost:8080", alias="SHERPA_PUBLIC_URL")
     demo_mode: bool = Field(default=True, alias="SHERPA_DEMO_MODE")
 
 

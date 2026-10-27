@@ -1,6 +1,7 @@
 """FastAPI entrypoint for the Sherpa agent service."""
 
 import asyncio
+import hmac
 import json
 import logging
 
@@ -12,8 +13,8 @@ from sse_starlette.sse import EventSourceResponse
 from sherpa import __version__
 from sherpa.config import Settings, get_settings
 from sherpa.logging import configure_logging
-from sherpa.pipeline import audit_job, spawn
-from sherpa.store.artifacts import get_artifacts
+from sherpa.pipeline import STAGES, audit_job, spawn
+from sherpa.store.artifacts import get_artifacts, sign
 from sherpa.store.runs import get_store
 
 settings = get_settings()
@@ -138,3 +139,32 @@ async def get_artifact(art_id: str) -> Response:
         raise HTTPException(404, "artifact not found")
     data, content_type = found
     return Response(data, media_type=content_type, headers={"Cache-Control": "private, max-age=86400"})
+
+
+@app.post("/api/runs/{run_id}/{stage}", dependencies=[Depends(require_api_key)])
+async def start_stage(run_id: str, stage: str) -> dict:
+    store = get_store()
+    run = await store.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "run not found")
+    spec = STAGES.get(stage)
+    if not spec:
+        raise HTTPException(404, f"unknown stage {stage}")
+    if str(run.get("status", "")).endswith(":running"):
+        raise HTTPException(409, "another stage is still running")
+    missing = [r for r in spec.requires if not run.get(r)]
+    if missing:
+        raise HTTPException(409, f"run {stage} after {', '.join(missing)}")
+    spawn(store, run_id, spec.name, lambda: spec.job(store, run))
+    return await store.update_run(run_id, status=f"{spec.name}:running", stage=spec.name)
+
+
+@app.get("/public/artifacts/{art_id:path}")
+async def public_artifact(art_id: str, sig: str) -> Response:
+    if not hmac.compare_digest(sig, sign(art_id)):
+        raise HTTPException(404, "artifact not found")
+    found = await get_artifacts().get(art_id)
+    if not found:
+        raise HTTPException(404, "artifact not found")
+    data, content_type = found
+    return Response(data, media_type=content_type, headers={"Cache-Control": "public, max-age=604800"})

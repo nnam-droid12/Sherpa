@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import logging
 import uuid
 
@@ -48,6 +50,17 @@ class Artifacts:
         except Exception:
             return None
         return data, blob.content_type or "image/jpeg"
+
+
+def sign(art_id: str) -> str:
+    key = (get_settings().api_key or "local").encode()
+    return hmac.new(key, art_id.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def public_url(art_id: str) -> str:
+    """Unguessable, read-only link for one artifact (used for screenshots in pull requests)."""
+    base = get_settings().public_url.rstrip("/")
+    return f"{base}/public/artifacts/{art_id}?sig={sign(art_id)}"
 
 
 _artifacts: Artifacts | None = None

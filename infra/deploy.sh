@@ -32,8 +32,11 @@ ensure_service_account() {
       --role "$role" --condition None >/dev/null
   done
   # Preview deploys run Cloud Run revisions as the runtime SA.
-  gcloud iam service-accounts add-iam-policy-binding "$SA" --member "serviceAccount:$SA" \
-    --role roles/iam.serviceAccountUser >/dev/null
+  if ! gcloud iam service-accounts get-iam-policy "$SA" --format 'value(bindings.role)' \
+      | grep -q roles/iam.serviceAccountUser; then
+    gcloud iam service-accounts add-iam-policy-binding "$SA" --member "serviceAccount:$SA" \
+      --role roles/iam.serviceAccountUser >/dev/null
+  fi
 }
 
 secret_flags() {

@@ -37,6 +37,7 @@ def require_api_key(
         raise HTTPException(status_code=401, detail="invalid API key")
 
 
+@app.get("/health")
 @app.get("/healthz")
 def healthz() -> dict:
     return {"ok": True, "service": "sherpa-agent", "version": __version__, "paypal": "sandbox"}

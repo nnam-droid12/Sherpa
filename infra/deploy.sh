@@ -20,9 +20,14 @@ ensure_service_account() {
   if ! gcloud iam service-accounts describe "$SA" >/dev/null 2>&1; then
     gcloud iam service-accounts create sherpa-runtime --display-name "Sherpa runtime"
   fi
+  # Only touch the project policy for roles that are missing, so parallel deploys don't race on it.
+  local have
+  have="$(gcloud projects get-iam-policy "$PROJECT" --flatten 'bindings[].members' \
+    --filter "bindings.members:serviceAccount:$SA" --format 'value(bindings.role)')"
   for role in roles/aiplatform.user roles/secretmanager.secretAccessor roles/datastore.user \
               roles/run.developer roles/cloudbuild.builds.editor roles/storage.admin \
               roles/artifactregistry.writer roles/logging.logWriter; do
+    grep -qx "$role" <<<"$have" && continue
     gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA" \
       --role "$role" --condition None >/dev/null
   done

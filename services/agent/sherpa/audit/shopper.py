@@ -208,8 +208,10 @@ async def _execute(
             b.session.blocked.append(url)
             return f"Navigation to {url} is blocked; stay on the store and PayPal."
         await page.goto(url)
-    elif name in ("click_at", "click"):
-        await page.mouse.click(_px(args["x"], w), _px(args["y"], h))
+    elif name in ("click_at", "click", "double_click", "triple_click", "right_click", "middle_click"):
+        clicks = {"double_click": 2, "triple_click": 3}.get(name, 1)
+        button = {"right_click": "right", "middle_click": "middle"}.get(name, "left")
+        await page.mouse.click(_px(args["x"], w), _px(args["y"], h), click_count=clicks, button=button)
     elif name in ("hover_at", "move"):
         await page.mouse.move(_px(args["x"], w), _px(args["y"], h))
     elif name in ("type_text_at", "type"):

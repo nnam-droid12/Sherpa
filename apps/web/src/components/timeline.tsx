@@ -5,6 +5,13 @@ import { artifactUrl, type RunEvent } from "@/lib/types";
 
 const ACTION_LABEL: Record<string, string> = {
   click_at: "Click",
+  click: "Click",
+  double_click: "Double-click",
+  type: "Type",
+  scroll: "Scroll",
+  press_key: "Key",
+  hotkey: "Keys",
+  wait: "Wait",
   type_text_at: "Type",
   scroll_document: "Scroll",
   scroll_at: "Scroll",

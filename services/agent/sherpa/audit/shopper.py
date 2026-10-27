@@ -276,6 +276,9 @@ async def run_shopper(
     save_shot: Callable[[bytes], Awaitable[str]] | None = None,
     max_steps: int = 60,
     timeout_s: int = 720,
+    goal: str = GOAL,
+    rules: str = RULES,
+    start_url: str | None = None,
 ) -> ShopperResult:
     settings = get_settings()
     started = time.monotonic()
@@ -295,14 +298,16 @@ async def run_shopper(
                 "session", device=device, live_view_url=session.live_view_url, replay_url=session.replay_url
             )
             b = _Browser(session, store_host)
-            await b.page.goto(store_url, wait_until="domcontentloaded")
+            await b.page.goto(start_url or store_url, wait_until="domcontentloaded")
 
             shot = await _screenshot(b.page)
             history: list[types.Content] = [
                 types.Content(
                     role="user",
                     parts=[
-                        types.Part(text=f"{GOAL}\n\n{RULES}\n\nThe store is open at {store_url}."),
+                        types.Part(
+                            text=f"{goal}\n\n{rules}\n\nThe browser is open at {start_url or store_url}."
+                        ),
                         types.Part.from_bytes(data=shot, mime_type="image/png"),
                     ],
                 )

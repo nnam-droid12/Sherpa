@@ -9,7 +9,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
+
+from sherpa.agentready.spec import agent_ready_check, agent_ready_task, run_contract_tests
 from sherpa.audit.runner import run_audit
+from sherpa.buyer.agent import next_weekday, run_buyer
 from sherpa.fixer import github
 from sherpa.fixer.agent import run_fixer
 from sherpa.fixer.pr import pr_body, scorecard_comment
@@ -131,6 +135,78 @@ async def verify_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+BUYER_REQUESTS = {
+    "lumen-bakehouse": "I need a birthday cake for 12 people delivered Saturday, under $90.",
+    "ember-oak": "I need a two-person tent for a fall backpacking trip, under $400.",
+}
+
+
+async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
+    run_id, repo, fix = run["id"], run["repo"], run["fix"]
+    emit = emitter(store, run_id, "agent_ready")
+    slug = parse_repo(repo)[1].removeprefix("sherpa-demo-")
+    await emit("log", message="Adding a catalog feed and PayPal Cart API v1 endpoints")
+    root = await clone(repo, fix["branch"])
+    try:
+        ws = Workspace(root)
+        outcome = await run_fixer(
+            ws,
+            run["audit"]["findings"],
+            emit,
+            store_type=run.get("store_type", "auto"),
+            task=agent_ready_task(),
+            checker=agent_ready_check,
+        )
+        if not ws.changed or not outcome.build_ok:
+            raise RuntimeError("The agent-ready changes did not build; nothing was pushed.")
+        sha = await github.commit_and_push(
+            root, fix["branch"], "feat(agent-ready): add catalog feed and PayPal Cart API v1 endpoints"
+        )
+        diff = await github.git(root, "show", "--format=", "--no-color", "HEAD")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    await github.comment(
+        repo,
+        fix["pr_number"],
+        "## Agent-ready\n\nAdded a catalog feed (`/catalog.json`) and PayPal Cart API v1 endpoints "
+        "(`/merchant-cart`) in a separate commit, with contract tests.\n\n"
+        f"{outcome.summary}\n\nOpened by Sherpa.",
+    )
+
+    service = f"store-{slug}"
+    preview_url = (await deploy_preview(repo, fix["branch"], service, f"pr-{fix['pr_number']}", emit)).rstrip(
+        "/"
+    )
+    feed = []
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            feed = (await c.get(f"{preview_url}/catalog.json")).json().get("items", [])
+    except Exception as exc:
+        await emit("warning", message=f"Catalog feed unreadable: {exc}")
+    item_id = feed[0]["id"] if feed else ""
+    date = next_weekday(5, min_days=7).isoformat()
+    endpoints = await run_contract_tests(
+        preview_url, item_id, [{"type": "DELIVERY_DATE_PREFERENCE", "value": date}]
+    )
+    await emit("log", message=f"Contract tests: {sum(e['ok'] for e in endpoints)}/{len(endpoints)} passed")
+
+    buyer = await run_buyer(preview_url, BUYER_REQUESTS.get(slug, "Buy your best-selling item."), emit)
+    return {
+        "agent_ready": {
+            "preview_url": preview_url,
+            "sha": sha,
+            "diff": diff[:MAX_DIFF],
+            "files_changed": outcome.files_changed,
+            "summary": outcome.summary,
+            "catalog_preview": feed[:3],
+            "endpoints": endpoints,
+            "transcript": buyer["transcript"],
+            "order": buyer["order"],
+            "pr_url": fix["pr_url"],
+        }
+    }
+
+
 @dataclass(frozen=True)
 class Stage:
     name: str
@@ -141,4 +217,5 @@ class Stage:
 STAGES: dict[str, Stage] = {
     "fix": Stage("fix", ("audit", "repo"), fix_job),
     "verify": Stage("verify", ("fix",), verify_job),
+    "agent-ready": Stage("agent_ready", ("fix",), agent_ready_job),
 }

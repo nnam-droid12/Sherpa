@@ -261,6 +261,7 @@ export function RunView({ runId, initial }: { runId: string; initial: Run | null
             this sandbox build, Sherpa&apos;s buyer agent plays that caller role.
           </p>
           <AgentLog events={events} phase="agent_ready" />
+          {stageState(run, "agent_ready") === "running" && <LiveView events={events} running phase="agent_ready" />}
           {run?.agent_ready && (
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="grid content-start gap-4">

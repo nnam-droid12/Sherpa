@@ -126,7 +126,7 @@ async def run_fixer(
     task: str | None = None,
     checker: Callable[[Workspace], list[str]] | None = self_check,
     max_tool_calls: int = 80,
-    max_seconds: int = 1500,
+    max_seconds: int = 2700,
 ) -> FixOutcome:
     settings = get_settings()
     started = time.monotonic()

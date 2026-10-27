@@ -248,6 +248,7 @@ async def run_buyer(store_url: str, request: str, emit: Emit, *, max_turns: int 
             system_instruction=SYSTEM,
             tools=[types.Tool(function_declarations=DECLARATIONS)],
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
         )
         history = [
             types.Content(

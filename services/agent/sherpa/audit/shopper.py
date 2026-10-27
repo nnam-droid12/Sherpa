@@ -143,6 +143,16 @@ async def _sandbox_login(page: Page, email: str, password: str) -> bool:
     email_box = page.locator("#email:visible, input[name='login_email']:visible").first
     pwd = page.locator("#password:visible, input[name='login_password']:visible").first
     try:
+        # US checkouts can open on "Check out as a guest"; the account login is behind a "Log In" link.
+        guest = page.get_by_text("Check out as a guest")
+        if await guest.count() and await guest.first.is_visible():
+            await (
+                page.get_by_role("link", name="Log In")
+                .or_(page.get_by_role("button", name="Log In"))
+                .first.click()
+            )
+            await page.wait_for_timeout(4000)
+            did = True
         if await email_box.count() and not await email_box.input_value():
             await email_box.fill(email)
             nxt = page.locator("#btnNext:visible").first
@@ -300,6 +310,8 @@ async def run_shopper(
     config = types.GenerateContentConfig(
         tools=[types.Tool(computer_use=types.ComputerUse(environment=types.Environment.ENVIRONMENT_BROWSER))],
         temperature=0,
+        # One click at a time needs little deliberation; LOW cuts per-step latency roughly tenfold.
+        thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
     )
     try:
         async with open_session(device, allowed, timeout_seconds=timeout_s + 120) as session:

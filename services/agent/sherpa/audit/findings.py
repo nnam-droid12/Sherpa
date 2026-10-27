@@ -122,7 +122,10 @@ async def write_findings(findings: list[Finding], context: dict[str, Any]) -> li
         f"Store context: {json.dumps(context)[:4000]}\n\n"
         "Findings (code, title, evidence, draft impact, draft fix):\n"
         + json.dumps(
-            [{"code": f.code, "title": f.title, "evidence": f.evidence, "impact": f.impact, "fix": f.fix} for f in findings]
+            [
+                {"code": f.code, "title": f.title, "evidence": f.evidence, "impact": f.impact, "fix": f.fix}
+                for f in findings
+            ]
         )
     )
     try:
@@ -135,7 +138,11 @@ async def write_findings(findings: list[Finding], context: dict[str, Any]) -> li
                 temperature=0.2,
             ),
         )
-        parsed = resp.parsed if isinstance(resp.parsed, _WordingList) else _WordingList.model_validate_json(resp.text)
+        parsed = (
+            resp.parsed
+            if isinstance(resp.parsed, _WordingList)
+            else _WordingList.model_validate_json(resp.text)
+        )
         by_code = {w.code: w for w in parsed.findings}
         for f in findings:
             w = by_code.get(f.code)

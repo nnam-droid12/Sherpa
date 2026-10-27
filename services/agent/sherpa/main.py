@@ -29,7 +29,9 @@ app.add_middleware(
 )
 
 
-def require_api_key(x_sherpa_key: str | None = Header(default=None), s: Settings = Depends(get_settings)) -> None:
+def require_api_key(
+    x_sherpa_key: str | None = Header(default=None), s: Settings = Depends(get_settings)
+) -> None:
     if s.api_key and x_sherpa_key != s.api_key:
         raise HTTPException(status_code=401, detail="invalid API key")
 
@@ -47,6 +49,25 @@ def public_config(s: Settings = Depends(get_settings)) -> dict:
         "location": s.gcp_location,
         "paypal": "sandbox",
     }
+
+
+@app.get("/api/demo-stores", dependencies=[Depends(require_api_key)])
+def demo_stores(s: Settings = Depends(get_settings)) -> list[dict]:
+    stores = [
+        ("ember-oak", "Ember & Oak", "Outdoor gear, HTML/JS + Express", s.demo_ember_oak_url),
+        ("lumen-bakehouse", "Lumen Bakehouse", "Preorder cakes, Next.js", s.demo_lumen_url),
+    ]
+    return [
+        {
+            "id": sid,
+            "name": name,
+            "tagline": tagline,
+            "store_url": url,
+            "repo": f"{s.demo_repo_owner}/sherpa-demo-{sid}",
+        }
+        for sid, name, tagline, url in stores
+        if url
+    ]
 
 
 class NewRun(BaseModel):

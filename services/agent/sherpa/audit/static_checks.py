@@ -15,14 +15,22 @@ import httpx
 
 LEGACY_SDK_RE = re.compile(r"""https://www\.(?:sandbox\.)?paypal\.com/sdk/js\?[^"'\s>`]*""", re.I)
 V6_SDK_RE = re.compile(r"""https://www\.(?:sandbox\.)?paypal\.com/web-sdk/v6/core""", re.I)
-PAY_LATER_RE = re.compile(r"""(paypal-message|data-pp-message|paypal\.Messages|createPayPalMessages|PayLaterMessage)""")
+PAY_LATER_RE = re.compile(
+    r"""(paypal-message|data-pp-message|paypal\.Messages|createPayPalMessages|PayLaterMessage)"""
+)
 VENMO_V6_RE = re.compile(r"""(venmo-button|createVenmoOneTimePaymentSession|VenmoButton)""", re.I)
 AMOUNT_FROM_CLIENT_RE = re.compile(r"""req\.body\b[^\n]*\btotal\b|\{\s*total\s*\}\s*=\s*req\.body""")
 VERIFY_SIG_RE = re.compile(r"""verify-webhook-signature|verifyWebhookSignature""")
 PAYMENT_GATE_RE = re.compile(r"""(Choose|Select) (a )?payment method""", re.I)
 BLANK_PAGE_RE = re.compile(r"""document\.body\.innerHTML\s*=\s*["']{2}""")
 WEBHOOK_PATHS = ("/api/webhooks/paypal", "/api/paypal/webhook", "/webhooks/paypal", "/api/webhook")
-FEED_PATHS = ("/catalog.json", "/api/catalog", "/products.json", "/.well-known/catalog.json", "/api/catalog/feed")
+FEED_PATHS = (
+    "/catalog.json",
+    "/api/catalog",
+    "/products.json",
+    "/.well-known/catalog.json",
+    "/api/catalog/feed",
+)
 CART_API_PATH = "/merchant-cart"
 
 
@@ -46,7 +54,10 @@ def detect_sdk(html: str) -> SdkInfo:
         info.script_urls = legacy
     for url in legacy:
         qs = parse_qs(urlparse(url.replace("&amp;", "&")).query)
-        for key, target in (("disable-funding", info.disable_funding), ("enable-funding", info.enable_funding)):
+        for key, target in (
+            ("disable-funding", info.disable_funding),
+            ("enable-funding", info.enable_funding),
+        ):
             for value in qs.get(key, []):
                 target.extend(v.strip() for v in value.split(",") if v.strip())
     return info
@@ -151,7 +162,9 @@ async def probe_endpoints(base_url: str, client: httpx.AsyncClient | None = None
     result = ProbeResult()
     try:
         for path in WEBHOOK_PATHS:
-            r = await client.post(urljoin(base_url, path), json={}, headers={"content-type": "application/json"})
+            r = await client.post(
+                urljoin(base_url, path), json={}, headers={"content-type": "application/json"}
+            )
             if r.status_code not in (404, 405):
                 result.webhook_endpoint = path
                 break
@@ -185,7 +198,9 @@ async def probe_cart_api(base_url: str, client: httpx.AsyncClient) -> dict[str, 
             body = r.json()
         except ValueError:
             present = False
-    structured = isinstance(body, dict) and any(k in body for k in ("validation_status", "validation_issues", "name"))
+    structured = isinstance(body, dict) and any(
+        k in body for k in ("validation_status", "validation_issues", "name")
+    )
     return {"present": present and structured, "status": r.status_code}
 
 

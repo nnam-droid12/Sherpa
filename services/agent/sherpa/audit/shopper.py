@@ -127,7 +127,10 @@ class _Browser:
 
     @property
     def size(self) -> tuple[int, int]:
-        vp = self.page.viewport_size or {"width": self.session.device.width, "height": self.session.device.height}
+        vp = self.page.viewport_size or {
+            "width": self.session.device.width,
+            "height": self.session.device.height,
+        }
         return vp["width"], vp["height"]
 
 
@@ -161,13 +164,29 @@ async def _screenshot(page: Page) -> bytes:
     return await page.screenshot(type="png", mask=mask, animations="disabled")
 
 
-async def _execute(b: _Browser, name: str, args: dict[str, Any], allowed_hosts: set[str], store_url: str) -> str | None:
+async def _execute(
+    b: _Browser, name: str, args: dict[str, Any], allowed_hosts: set[str], store_url: str
+) -> str | None:
     """Run one computer-use action; returns an error string the model should see, if any."""
     page = b.page
     w, h = b.size
-    key_map = {"control": "Control", "ctrl": "Control", "enter": "Enter", "shift": "Shift", "alt": "Alt",
-               "meta": "Meta", "cmd": "Meta", "command": "Meta", "tab": "Tab", "escape": "Escape", "esc": "Escape",
-               "backspace": "Backspace", "pagedown": "PageDown", "pageup": "PageUp", "space": " "}
+    key_map = {
+        "control": "Control",
+        "ctrl": "Control",
+        "enter": "Enter",
+        "shift": "Shift",
+        "alt": "Alt",
+        "meta": "Meta",
+        "cmd": "Meta",
+        "command": "Meta",
+        "tab": "Tab",
+        "escape": "Escape",
+        "esc": "Escape",
+        "backspace": "Backspace",
+        "pagedown": "PageDown",
+        "pageup": "PageUp",
+        "space": " ",
+    }
 
     def norm_keys(keys: Any) -> str:
         parts = keys if isinstance(keys, list) else str(keys).split("+")
@@ -272,7 +291,9 @@ async def run_shopper(
     try:
         async with open_session(device, allowed, timeout_seconds=timeout_s + 120) as session:
             result.live_view_url = session.live_view_url
-            await emit("session", device=device, live_view_url=session.live_view_url, replay_url=session.replay_url)
+            await emit(
+                "session", device=device, live_view_url=session.live_view_url, replay_url=session.replay_url
+            )
             b = _Browser(session, store_host)
             await b.page.goto(store_url, wait_until="domcontentloaded")
 
@@ -326,7 +347,9 @@ async def run_shopper(
                             break
                         extra["safety_acknowledgement"] = "true"
                     error = await _execute(b, call.name, args, allowed, store_url)
-                    if await _sandbox_login(b.page, settings.paypal_buyer_email, settings.paypal_buyer_password):
+                    if await _sandbox_login(
+                        b.page, settings.paypal_buyer_email, settings.paypal_buyer_password
+                    ):
                         await emit("sandbox_login", device=device, step=n)
 
                     probe = await probe_page(b.page if b.page is b.main else b.main)
@@ -339,18 +362,33 @@ async def run_shopper(
                         result.reached_payment = True
                     if checkout_seen_at is None and re.search(r"checkout|cart", probe.get("url", ""), re.I):
                         checkout_seen_at = n
-                    if checkout_seen_at is not None and not result.reached_payment and call.name in ("click_at", "click"):
+                    if (
+                        checkout_seen_at is not None
+                        and not result.reached_payment
+                        and call.name in ("click_at", "click")
+                    ):
                         clicks_since_checkout += 1
 
                     shot = await _screenshot(b.page)
                     shot_id = await save_shot(_jpeg(shot)) if save_shot else None
-                    safe_args = {k: ("•••" if k == "text" and "paypal.com" in b.page.url else v) for k, v in args.items()}
+                    safe_args = {
+                        k: ("•••" if k == "text" and "paypal.com" in b.page.url else v)
+                        for k, v in args.items()
+                    }
                     step = Step(n, call.name, safe_args, narration, b.page.url, probe, shot_id)
                     result.steps.append(step)
                     await emit(
-                        "step", device=device, step=n, action=call.name, args=safe_args, narration=narration,
-                        url=b.page.url, shot_id=shot_id, paypal_visible=probe.get("paypal_visible", False),
-                        above_fold=probe.get("above_fold", False), error=error,
+                        "step",
+                        device=device,
+                        step=n,
+                        action=call.name,
+                        args=safe_args,
+                        narration=narration,
+                        url=b.page.url,
+                        shot_id=shot_id,
+                        paypal_visible=probe.get("paypal_visible", False),
+                        above_fold=probe.get("above_fold", False),
+                        error=error,
                     )
                     payload: dict[str, Any] = {"url": b.page.url, **extra}
                     if error:
@@ -362,7 +400,9 @@ async def run_shopper(
                                 response=payload,
                                 parts=[
                                     types.FunctionResponsePart(
-                                        inline_data=types.FunctionResponseBlob(mime_type="image/png", data=shot)
+                                        inline_data=types.FunctionResponseBlob(
+                                            mime_type="image/png", data=shot
+                                        )
                                     )
                                 ],
                             )
@@ -391,8 +431,13 @@ async def run_shopper(
                 break
     result.seconds = round(time.monotonic() - started, 1)
     await emit(
-        "shopper_done", device=device, reached_payment=result.reached_payment,
-        payment_completed=result.payment_completed, order=result.completed_order, replay_url=result.replay_url,
-        summary=result.summary, error=result.error,
+        "shopper_done",
+        device=device,
+        reached_payment=result.reached_payment,
+        payment_completed=result.payment_completed,
+        order=result.completed_order,
+        replay_url=result.replay_url,
+        summary=result.summary,
+        error=result.error,
     )
     return result

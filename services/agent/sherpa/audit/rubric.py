@@ -81,7 +81,9 @@ class Score:
         }
 
 
-def device_evidence_from_probes(probes: list[dict[str, Any]], *, reached: bool, completed: bool, **kw: Any) -> DeviceEvidence:
+def device_evidence_from_probes(
+    probes: list[dict[str, Any]], *, reached: bool, completed: bool, **kw: Any
+) -> DeviceEvidence:
     d = DeviceEvidence(reached_payment=reached, payment_completed=completed, **kw)
     for p in probes:
         if "error" in p:
@@ -110,7 +112,9 @@ def score(ev: AuditEvidence) -> Score:
         cats[cat]["score"] = min(cats[cat]["max"], cats[cat]["score"] + pts)
 
     def find(finding_code: str, cat: str, sev: str, title: str, **evidence: Any) -> None:
-        findings.append(Finding(finding_code, cat, sev, title, {k: v for k, v in evidence.items() if v is not None}))
+        findings.append(
+            Finding(finding_code, cat, sev, title, {k: v for k, v in evidence.items() if v is not None})
+        )
 
     d, m = ev.desktop, ev.mobile
 
@@ -118,13 +122,23 @@ def score(ev: AuditEvidence) -> Score:
     if d.paypal_above_fold:
         add("presentment", 10)
     elif d.paypal_present or d.reached_payment:
-        find("BUTTON_BELOW_FOLD_DESKTOP", "presentment", "high",
-             "PayPal button sits below the fold on desktop", screenshot=d.evidence_shot)
+        find(
+            "BUTTON_BELOW_FOLD_DESKTOP",
+            "presentment",
+            "high",
+            "PayPal button sits below the fold on desktop",
+            screenshot=d.evidence_shot,
+        )
     if m.paypal_above_fold:
         add("presentment", 10)
     elif m.paypal_present and not m.paypal_hidden:
-        find("BUTTON_BELOW_FOLD_MOBILE", "presentment", "high",
-             "PayPal button sits below the fold on mobile", screenshot=m.evidence_shot)
+        find(
+            "BUTTON_BELOW_FOLD_MOBILE",
+            "presentment",
+            "high",
+            "PayPal button sits below the fold on mobile",
+            screenshot=m.evidence_shot,
+        )
 
     # Payment options
     if ev.sdk.version != "none" or d.reached_payment or m.reached_payment:
@@ -134,20 +148,36 @@ def score(ev: AuditEvidence) -> Score:
     if ev.venmo:
         add("payment_options", 5)
     else:
-        find("NO_VENMO", "payment_options", "medium", "Venmo is not offered to US shoppers",
-             script=", ".join(ev.sdk.script_urls[:1]) or None, disabled="venmo" in ev.sdk.disable_funding)
+        find(
+            "NO_VENMO",
+            "payment_options",
+            "medium",
+            "Venmo is not offered to US shoppers",
+            script=", ".join(ev.sdk.script_urls[:1]) or None,
+            disabled="venmo" in ev.sdk.disable_funding,
+        )
     if ev.pay_later:
         add("payment_options", 5)
     else:
-        find("NO_PAY_LATER", "payment_options", "medium", "No Pay Later messaging on eligible items",
-             disabled="paylater" in ev.sdk.disable_funding)
+        find(
+            "NO_PAY_LATER",
+            "payment_options",
+            "medium",
+            "No Pay Later messaging on eligible items",
+            disabled="paylater" in ev.sdk.disable_funding,
+        )
 
     # SDK modernity
     if ev.sdk.version == "v6":
         add("sdk_modernity", 10)
     elif ev.sdk.version == "v5":
-        find("SDK_LEGACY", "sdk_modernity", "high", "Checkout uses the legacy PayPal JS SDK (v5)",
-             script=ev.sdk.script_urls[0] if ev.sdk.script_urls else None)
+        find(
+            "SDK_LEGACY",
+            "sdk_modernity",
+            "high",
+            "Checkout uses the legacy PayPal JS SDK (v5)",
+            script=ev.sdk.script_urls[0] if ev.sdk.script_urls else None,
+        )
 
     # Mobile checkout completion
     if m.reached_payment:
@@ -155,48 +185,86 @@ def score(ev: AuditEvidence) -> Score:
     if m.payment_completed:
         add("mobile_completion", 8)
     if m.ran and m.paypal_hidden:
-        find("BUTTON_HIDDEN_MOBILE", "mobile_completion", "critical",
-             "The PayPal button is hidden on phone-sized screens", screenshot=m.evidence_shot)
+        find(
+            "BUTTON_HIDDEN_MOBILE",
+            "mobile_completion",
+            "critical",
+            "The PayPal button is hidden on phone-sized screens",
+            screenshot=m.evidence_shot,
+        )
     elif m.ran and not m.payment_completed and not m.crashed:
-        find("MOBILE_PAYMENT_FAILED", "mobile_completion", "high",
-             "A shopper could not finish paying on mobile", screenshot=m.evidence_shot)
+        find(
+            "MOBILE_PAYMENT_FAILED",
+            "mobile_completion",
+            "high",
+            "A shopper could not finish paying on mobile",
+            screenshot=m.evidence_shot,
+        )
 
     # Steps to pay
     gated = d.payment_gate or m.payment_gate or bool(ev.server and ev.server.payment_gated)
     crashed = d.crashed or m.crashed
     if crashed:
-        find("CHECKOUT_CRASH", "steps_to_pay", "critical", "Checkout crashes before the shopper can pay",
-             screenshot=(m if m.crashed else d).evidence_shot)
+        find(
+            "CHECKOUT_CRASH",
+            "steps_to_pay",
+            "critical",
+            "Checkout crashes before the shopper can pay",
+            screenshot=(m if m.crashed else d).evidence_shot,
+        )
     else:
         add("steps_to_pay", 10 - (5 if gated else 0))
     if gated:
-        find("EXTRA_CLICK", "steps_to_pay", "high",
-             "PayPal is hidden behind an extra 'choose payment method' click",
-             code=ev.server.evidence.get("payment_gated") if ev.server else None)
+        find(
+            "EXTRA_CLICK",
+            "steps_to_pay",
+            "high",
+            "PayPal is hidden behind an extra 'choose payment method' click",
+            code=ev.server.evidence.get("payment_gated") if ev.server else None,
+        )
 
     # Server-side correctness
     s = ev.server
     if s is not None:
         if s.amount_from_client:
-            find("AMOUNT_FROM_CLIENT", "server_correctness", "critical",
-                 "Order amount is taken from the browser and never verified", code=s.evidence.get("amount_from_client"))
+            find(
+                "AMOUNT_FROM_CLIENT",
+                "server_correctness",
+                "critical",
+                "Order amount is taken from the browser and never verified",
+                code=s.evidence.get("amount_from_client"),
+            )
         else:
             add("server_correctness", 8)
         if s.webhook_signature_verified:
             add("server_correctness", 7)
         elif "webhook_unverified" in s.evidence:
-            find("WEBHOOK_UNVERIFIED", "server_correctness", "high",
-                 "Webhook events are accepted without verifying PayPal's signature",
-                 code=s.evidence["webhook_unverified"])
+            find(
+                "WEBHOOK_UNVERIFIED",
+                "server_correctness",
+                "high",
+                "Webhook events are accepted without verifying PayPal's signature",
+                code=s.evidence["webhook_unverified"],
+            )
         else:
             find("WEBHOOK_MISSING", "server_correctness", "high", "No PayPal webhook endpoint")
         if s.blank_page_on_error:
-            find("BLANK_PAGE_ON_ERROR", "server_correctness", "high",
-                 "A failed payment leaves the shopper on a blank page", code=s.evidence.get("blank_page_on_error"))
+            find(
+                "BLANK_PAGE_ON_ERROR",
+                "server_correctness",
+                "high",
+                "A failed payment leaves the shopper on a blank page",
+                code=s.evidence.get("blank_page_on_error"),
+            )
         elif s.graceful_errors:
             add("server_correctness", 5)
         else:
-            find("NO_ERROR_HANDLING", "server_correctness", "medium", "Payment errors are not shown to the shopper")
+            find(
+                "NO_ERROR_HANDLING",
+                "server_correctness",
+                "medium",
+                "Payment errors are not shown to the shopper",
+            )
     else:
         if ev.probes.webhook_endpoint:
             add("server_correctness", 3)
@@ -213,7 +281,9 @@ def score(ev: AuditEvidence) -> Score:
     if ev.probes.cart_api.get("present"):
         add("agent_readiness", 6)
     else:
-        find("NO_CART_API", "agent_readiness", "medium", "No PayPal Cart API endpoints for AI shopping agents")
+        find(
+            "NO_CART_API", "agent_readiness", "medium", "No PayPal Cart API endpoints for AI shopping agents"
+        )
 
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     findings.sort(key=lambda f: (order[f.severity], f.category))

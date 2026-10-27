@@ -62,7 +62,10 @@ class PayPalClient:
         return r.json() if r.status_code < 400 else None
 
     async def create_order(self, amount: str, currency: str = "USD", **extra: Any) -> dict[str, Any]:
-        body = {"intent": "CAPTURE", "purchase_units": [{"amount": {"currency_code": currency, "value": amount}}]}
+        body = {
+            "intent": "CAPTURE",
+            "purchase_units": [{"amount": {"currency_code": currency, "value": amount}}],
+        }
         body.update(extra)
         r = await self._request("POST", "/v2/checkout/orders", json=body)
         r.raise_for_status()
@@ -72,7 +75,9 @@ class PayPalClient:
         r = await self._request("POST", f"/v2/checkout/orders/{order_id}/capture")
         return r.json()
 
-    async def verify_webhook_signature(self, headers: dict[str, str], event: dict[str, Any], webhook_id: str) -> bool:
+    async def verify_webhook_signature(
+        self, headers: dict[str, str], event: dict[str, Any], webhook_id: str
+    ) -> bool:
         h = {k.lower(): v for k, v in headers.items()}
         body = {
             "auth_algo": h.get("paypal-auth-algo"),

@@ -19,7 +19,9 @@ def parse_repo(repo: str) -> tuple[str, str]:
     return m.group(1), m.group(2)
 
 
-async def run(*args: str, cwd: Path | None = None, timeout: int = 300, env: dict[str, str] | None = None) -> tuple[int, str]:
+async def run(
+    *args: str, cwd: Path | None = None, timeout: int = 300, env: dict[str, str] | None = None
+) -> tuple[int, str]:
     proc = await asyncio.create_subprocess_exec(
         *args, cwd=cwd, env=env, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
     )

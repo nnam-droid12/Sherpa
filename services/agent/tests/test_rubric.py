@@ -31,9 +31,18 @@ LUMEN_CODES = {
 
 
 def _probe(**kw):
-    base = {"url": "https://x/cart", "viewport_height": 900, "candidates": [], "crashed": False, "blank": False,
-            "payment_gate": False, "pay_later_message": False, "paypal_present": False, "paypal_visible": False,
-            "above_fold": False}
+    base = {
+        "url": "https://x/cart",
+        "viewport_height": 900,
+        "candidates": [],
+        "crashed": False,
+        "blank": False,
+        "payment_gate": False,
+        "pay_later_message": False,
+        "paypal_present": False,
+        "paypal_visible": False,
+        "above_fold": False,
+    }
     base.update(kw)
     return base
 
@@ -43,16 +52,23 @@ def _evidence(store, desktop, mobile):
     sdk = sc.detect_sdk_in_source(files)
     corpus = "\n".join(files.values())
     return AuditEvidence(
-        sdk=sdk, pay_later=sc.has_pay_later(corpus), venmo=sc.has_venmo(sdk, corpus),
-        probes=sc.ProbeResult(), desktop=desktop, mobile=mobile, server=sc.analyze_source(files),
+        sdk=sdk,
+        pay_later=sc.has_pay_later(corpus),
+        venmo=sc.has_venmo(sdk, corpus),
+        probes=sc.ProbeResult(),
+        desktop=desktop,
+        mobile=mobile,
+        server=sc.analyze_source(files),
     )
 
 
 def test_ember_oak_baseline_finds_every_planted_flaw():
     desktop = device_evidence_from_probes(
-        [_probe(paypal_present=True, paypal_visible=True, above_fold=False)], reached=True, completed=True)
+        [_probe(paypal_present=True, paypal_visible=True, above_fold=False)], reached=True, completed=True
+    )
     mobile = device_evidence_from_probes(
-        [_probe(paypal_present=True, paypal_visible=False)], reached=False, completed=False)
+        [_probe(paypal_present=True, paypal_visible=False)], reached=False, completed=False
+    )
     result = score(_evidence("ember-oak", desktop, mobile))
     codes = {f.code for f in result.findings}
     assert EMBER_OAK_CODES <= codes
@@ -62,7 +78,9 @@ def test_ember_oak_baseline_finds_every_planted_flaw():
 def test_lumen_baseline_finds_every_planted_flaw():
     desktop = device_evidence_from_probes(
         [_probe(payment_gate=True), _probe(paypal_present=True, paypal_visible=True, above_fold=True)],
-        reached=True, completed=True)
+        reached=True,
+        completed=True,
+    )
     mobile = device_evidence_from_probes([_probe(crashed=True)], reached=False, completed=False)
     result = score(_evidence("lumen-bakehouse", desktop, mobile))
     codes = {f.code for f in result.findings}
@@ -72,27 +90,39 @@ def test_lumen_baseline_finds_every_planted_flaw():
 
 def test_fixed_store_scores_high():
     sdk = sc.SdkInfo(version="v6", script_urls=["https://www.sandbox.paypal.com/web-sdk/v6/core"])
-    good = DeviceEvidence(reached_payment=True, payment_completed=True, paypal_present=True, paypal_above_fold=True)
-    server = sc.ServerSignals(amount_from_client=False, webhook_signature_verified=True, blank_page_on_error=False,
-                              graceful_errors=True, payment_gated=False)
+    good = DeviceEvidence(
+        reached_payment=True, payment_completed=True, paypal_present=True, paypal_above_fold=True
+    )
+    server = sc.ServerSignals(
+        amount_from_client=False,
+        webhook_signature_verified=True,
+        blank_page_on_error=False,
+        graceful_errors=True,
+        payment_gated=False,
+    )
     probes = sc.ProbeResult(catalog_feed="/catalog.json", catalog_items=6, cart_api={"present": True})
-    result = score(AuditEvidence(sdk=sdk, pay_later=True, venmo=True, probes=probes, desktop=good, mobile=good,
-                                 server=server))
+    result = score(
+        AuditEvidence(
+            sdk=sdk, pay_later=True, venmo=True, probes=probes, desktop=good, mobile=good, server=server
+        )
+    )
     assert result.total == sum(WEIGHTS.values()) == 100
     assert result.findings == []
 
 
 def test_score_is_deterministic():
-    desktop = device_evidence_from_probes([_probe(paypal_present=True, paypal_visible=True)], reached=True,
-                                          completed=False)
+    desktop = device_evidence_from_probes(
+        [_probe(paypal_present=True, paypal_visible=True)], reached=True, completed=False
+    )
     mobile = DeviceEvidence(ran=False)
     totals = {score(_evidence("ember-oak", desktop, mobile)).total for _ in range(3)}
     assert len(totals) == 1
 
 
 def test_every_code_has_default_wording():
-    desktop = device_evidence_from_probes([_probe(paypal_present=True, paypal_visible=True)], reached=True,
-                                          completed=True)
+    desktop = device_evidence_from_probes(
+        [_probe(paypal_present=True, paypal_visible=True)], reached=True, completed=True
+    )
     mobile = device_evidence_from_probes([_probe(paypal_present=True)], reached=False, completed=False)
     result = score(_evidence("ember-oak", desktop, mobile))
     apply_defaults(result.findings)

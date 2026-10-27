@@ -23,6 +23,13 @@ def _retryable(exc: BaseException) -> bool:
     return isinstance(exc, (TimeoutError, ConnectionError))
 
 
-@retry(reraise=True, stop=stop_after_attempt(4), wait=wait_exponential(multiplier=1, max=20), retry=retry_if_exception(_retryable))
-async def generate(model: str, contents, config: types.GenerateContentConfig) -> types.GenerateContentResponse:
+@retry(
+    reraise=True,
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=1, max=20),
+    retry=retry_if_exception(_retryable),
+)
+async def generate(
+    model: str, contents, config: types.GenerateContentConfig
+) -> types.GenerateContentResponse:
     return await get_client().aio.models.generate_content(model=model, contents=contents, config=config)

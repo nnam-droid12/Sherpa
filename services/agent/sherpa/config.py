@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     firestore_db: str = Field(default="sherpa", alias="SHERPA_FIRESTORE_DB")
     gcp_region: str = Field(default="us-east1", alias="GCP_REGION")
     artifacts_bucket: str = Field(default="nixora-project-sherpa-artifacts", alias="SHERPA_ARTIFACTS_BUCKET")
+    demo_ember_oak_url: str = Field(default="", alias="DEMO_EMBER_OAK_URL")
+    demo_lumen_url: str = Field(default="", alias="DEMO_LUMEN_URL")
+    demo_repo_owner: str = Field(default="nnam-droid12", alias="DEMO_REPO_OWNER")
     demo_mode: bool = Field(default=True, alias="SHERPA_DEMO_MODE")
 
 

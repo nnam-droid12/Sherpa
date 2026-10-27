@@ -12,10 +12,11 @@ from typing import Any
 from sherpa.audit.runner import run_audit
 from sherpa.fixer import github
 from sherpa.fixer.agent import run_fixer
-from sherpa.fixer.pr import pr_body
+from sherpa.fixer.pr import pr_body, scorecard_comment
 from sherpa.fixer.tools import Workspace
 from sherpa.gitrepo import clone, parse_repo
 from sherpa.store.runs import RunStore
+from sherpa.verify.preview import deploy_preview
 
 log = logging.getLogger(__name__)
 
@@ -107,6 +108,29 @@ async def fix_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
         shutil.rmtree(root, ignore_errors=True)
 
 
+async def verify_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
+    run_id, repo, fix = run["id"], run["repo"], run["fix"]
+    emit = emitter(store, run_id, "verify")
+    service = f"store-{parse_repo(repo)[1].removeprefix('sherpa-demo-')}"
+    tag = f"pr-{fix['pr_number']}"
+    preview_url = (await deploy_preview(repo, fix["branch"], service, tag, emit)).rstrip("/")
+    await emit("log", message="Re-running the shopper on desktop and mobile against the preview")
+    after = await run_audit(store, run_id, preview_url, repo=repo, branch=fix["branch"], label="after")
+
+    shoppers = after.get("shoppers", {})
+    order = (shoppers.get("mobile") or {}).get("order") or (shoppers.get("desktop") or {}).get("order")
+    comment_url = ""
+    try:
+        comment_url = await github.comment(
+            repo, fix["pr_number"], scorecard_comment(run["audit"], after, preview_url, order)
+        )
+    except Exception as exc:
+        await emit("warning", message=f"Could not comment on the PR: {exc}")
+    return {
+        "verify": {"preview_url": preview_url, "audit": after, "order": order, "comment_url": comment_url}
+    }
+
+
 @dataclass(frozen=True)
 class Stage:
     name: str
@@ -116,4 +140,5 @@ class Stage:
 
 STAGES: dict[str, Stage] = {
     "fix": Stage("fix", ("audit", "repo"), fix_job),
+    "verify": Stage("verify", ("fix",), verify_job),
 }

@@ -11,6 +11,10 @@ TARGET="${1:-all}"
 
 gcloud config set project "$PROJECT" >/dev/null
 
+ensure_registry() {
+  gcloud artifacts repositories describe sherpa --location "$REGION" >/dev/null 2>&1 || \n    gcloud artifacts repositories create sherpa --repository-format docker --location "$REGION" --quiet
+}
+
 ensure_service_account() {
   if ! gcloud iam service-accounts describe "$SA" >/dev/null 2>&1; then
     gcloud iam service-accounts create sherpa-runtime --display-name "Sherpa runtime"
@@ -69,6 +73,7 @@ deploy_stores() {
 }
 
 ensure_service_account
+ensure_registry
 case "$TARGET" in
   agent) deploy_agent ;;
   web) deploy_web ;;

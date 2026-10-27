@@ -4,7 +4,7 @@
 set -euo pipefail
 
 PROJECT="${GOOGLE_CLOUD_PROJECT:-nixora-project}"
-REGION="${REGION:-us-central1}"
+REGION="${REGION:-us-east1}"
 SA="sherpa-runtime@${PROJECT}.iam.gserviceaccount.com"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="${1:-all}"

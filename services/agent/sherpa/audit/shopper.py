@@ -197,17 +197,17 @@ async def _execute(
     if name in ("wait_5_seconds", "wait"):
         await asyncio.sleep(float(args.get("seconds", 5)) if name == "wait" else 5)
     elif name == "go_back":
-        await page.go_back()
+        await page.go_back(wait_until="domcontentloaded", timeout=20000)
     elif name == "go_forward":
-        await page.go_forward()
+        await page.go_forward(wait_until="domcontentloaded", timeout=20000)
     elif name == "search":
-        await page.goto(store_url)
+        await page.goto(store_url, wait_until="domcontentloaded", timeout=20000)
     elif name == "navigate":
         url = str(args.get("url", ""))
         if not host_allowed(url, allowed_hosts):
             b.session.blocked.append(url)
             return f"Navigation to {url} is blocked; stay on the store and PayPal."
-        await page.goto(url)
+        await page.goto(url, wait_until="domcontentloaded", timeout=20000)
     elif name in ("click_at", "click", "double_click", "triple_click", "right_click", "middle_click"):
         clicks = {"double_click": 2, "triple_click": 3}.get(name, 1)
         button = {"right_click": "right", "middle_click": "middle"}.get(name, "left")
@@ -353,7 +353,10 @@ async def run_shopper(
                             stop = True
                             break
                         extra["safety_acknowledgement"] = "true"
-                    error = await _execute(b, call.name, args, allowed, store_url)
+                    try:
+                        error = await _execute(b, call.name, args, allowed, store_url)
+                    except Exception as exc:  # report to the model and keep going
+                        error = f"The action failed: {type(exc).__name__}: {str(exc)[:200]}"
                     if await _sandbox_login(
                         b.page, settings.paypal_buyer_email, settings.paypal_buyer_password
                     ):

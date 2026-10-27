@@ -66,8 +66,9 @@ deploy_stores() {
   secrets="$(secret_flags PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET PAYPAL_WEBHOOK_ID)"
   for store in ember-oak lumen-bakehouse; do
     [ -d "$ROOT/demo-stores/$store" ] || continue
+    # One instance: demo carts for the Cart API live in memory.
     gcloud run deploy "store-$store" --source "$ROOT/demo-stores/$store" --region "$REGION" \
-      --service-account "$SA" --allow-unauthenticated --memory 512Mi \
+      --service-account "$SA" --allow-unauthenticated --memory 512Mi --max-instances 1 \
       ${secrets:+--set-secrets "$secrets"} --quiet
   done
 }

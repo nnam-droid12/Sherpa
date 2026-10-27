@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     demo_repo_owner: str = Field(default="nnam-droid12", alias="DEMO_REPO_OWNER")
     public_url: str = Field(default="http://localhost:8080", alias="SHERPA_PUBLIC_URL")
     demo_mode: bool = Field(default=True, alias="SHERPA_DEMO_MODE")
+    runs_per_hour: int = Field(default=6, alias="SHERPA_RUNS_PER_HOUR")
 
 
 class LiveModeError(RuntimeError):

@@ -14,6 +14,7 @@ from sherpa import __version__
 from sherpa.config import Settings, get_settings
 from sherpa.logging import configure_logging
 from sherpa.pipeline import STAGES, audit_job, spawn
+from sherpa.ratelimit import enforce
 from sherpa.store.artifacts import get_artifacts, sign
 from sherpa.store.runs import get_store
 
@@ -54,11 +55,23 @@ def public_config(s: Settings = Depends(get_settings)) -> dict:
 
 
 @app.get("/api/demo-stores", dependencies=[Depends(require_api_key)])
-def demo_stores(s: Settings = Depends(get_settings)) -> list[dict]:
+async def demo_stores(s: Settings = Depends(get_settings)) -> list[dict]:
     stores = [
         ("ember-oak", "Ember & Oak", "Outdoor gear, HTML/JS + Express", s.demo_ember_oak_url),
         ("lumen-bakehouse", "Lumen Bakehouse", "Preorder cakes, Next.js", s.demo_lumen_url),
     ]
+    # Demo mode: point each store at its furthest-along recent run so judges can open one instantly.
+    recent: dict[str, dict] = {}
+    try:
+        for run in await get_store().list_runs(60):
+            sid = run.get("demo_store")
+            if not sid or not run.get("audit"):
+                continue
+            depth = sum(bool(run.get(k)) for k in ("audit", "fix", "verify", "agent_ready"))
+            if depth > recent.get(sid, {}).get("depth", 0):
+                recent[sid] = {"id": run["id"], "depth": depth}
+    except Exception:
+        log.warning("could not list recent runs", exc_info=True)
     return [
         {
             "id": sid,
@@ -66,6 +79,7 @@ def demo_stores(s: Settings = Depends(get_settings)) -> list[dict]:
             "tagline": tagline,
             "store_url": url,
             "repo": f"{s.demo_repo_owner}/sherpa-demo-{sid}",
+            "recent_run_id": recent.get(sid, {}).get("id"),
         }
         for sid, name, tagline, url in stores
         if url
@@ -79,7 +93,7 @@ class NewRun(BaseModel):
     demo_store: str | None = None
 
 
-@app.post("/api/runs", dependencies=[Depends(require_api_key)])
+@app.post("/api/runs", dependencies=[Depends(require_api_key), Depends(enforce)])
 async def create_run(body: NewRun) -> dict:
     store = get_store()
     run = await store.create_run(
@@ -142,7 +156,7 @@ async def get_artifact(art_id: str) -> Response:
     return Response(data, media_type=content_type, headers={"Cache-Control": "private, max-age=86400"})
 
 
-@app.post("/api/runs/{run_id}/{stage}", dependencies=[Depends(require_api_key)])
+@app.post("/api/runs/{run_id}/{stage}", dependencies=[Depends(require_api_key), Depends(enforce)])
 async def start_stage(run_id: str, stage: str) -> dict:
     store = get_store()
     run = await store.get_run(run_id)

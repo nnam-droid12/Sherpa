@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import shutil
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -28,13 +29,33 @@ _tasks: set[asyncio.Task] = set()
 MAX_DIFF = 150_000
 
 
+def add_usage(usage: dict[str, float] | None, patch: dict[str, Any], seconds: float) -> dict[str, float]:
+    """Accumulate browser steps, browser minutes and model calls for the run's cost display."""
+    total = {"steps": 0, "browser_minutes": 0.0, "model_calls": 0, "seconds": 0.0, **(usage or {})}
+    audits = [patch.get("audit"), (patch.get("verify") or {}).get("audit")]
+    for audit in filter(None, audits):
+        for s in audit.get("shoppers", {}).values():
+            total["steps"] += s.get("steps") or 0
+            total["model_calls"] += s.get("model_calls") or 0
+            total["browser_minutes"] += (s.get("seconds") or 0) / 60
+    for key in ("fix", "agent_ready"):
+        total["model_calls"] += (patch.get(key) or {}).get("model_calls") or 0
+    total["seconds"] += seconds
+    total["browser_minutes"] = round(total["browser_minutes"], 1)
+    total["seconds"] = round(total["seconds"], 1)
+    return total
+
+
 def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[dict[str, Any]]]) -> None:
     """Run a stage in the background; failures are recorded on the run instead of being lost."""
 
     async def wrapper() -> None:
         await store.update_run(run_id, status=f"{stage}:running", stage=stage, error=None)
+        started = time.monotonic()
         try:
             patch = await job()
+            run = await store.get_run(run_id) or {}
+            patch["usage"] = add_usage(run.get("usage"), patch, time.monotonic() - started)
             await store.update_run(run_id, status=f"{stage}:done", **patch)
         except Exception as exc:
             log.exception("stage %s failed", stage, extra={"run_id": run_id})

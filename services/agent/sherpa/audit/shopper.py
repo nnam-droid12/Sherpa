@@ -139,20 +139,28 @@ async def _sandbox_login(page: Page, email: str, password: str) -> bool:
     if not (urlparse(page.url).hostname or "").endswith("paypal.com") or not email:
         return False
     did = False
+    # PayPal's login page keeps hidden duplicates of its inputs, so only ever target visible ones.
+    email_box = page.locator("#email:visible, input[name='login_email']:visible").first
+    pwd = page.locator("#password:visible, input[name='login_password']:visible").first
     try:
-        email_box = page.locator("#email, input[name='login_email']").first
-        if await email_box.is_visible(timeout=500) and not await email_box.input_value():
+        if await email_box.count() and not await email_box.input_value():
             await email_box.fill(email)
-            nxt = page.locator("#btnNext")
-            if await nxt.is_visible(timeout=500):
+            nxt = page.locator("#btnNext:visible").first
+            if await nxt.count():
                 await nxt.click()
-                await page.wait_for_timeout(1500)
             did = True
-        pwd = page.locator("#password, input[name='login_password']").first
-        if await pwd.is_visible(timeout=1500) and not await pwd.input_value():
+        try:
+            await pwd.wait_for(state="visible", timeout=10000 if did else 1500)
+        except Exception:
+            return did
+        if not await pwd.input_value():
             await pwd.fill(password)
-            await page.locator("#btnLogin, button[type='submit']").first.click()
-            await page.wait_for_load_state("domcontentloaded", timeout=15000)
+            await page.locator("#btnLogin:visible, button[type='submit']:visible").first.click()
+            try:
+                await page.wait_for_load_state("domcontentloaded", timeout=15000)
+                await page.wait_for_timeout(3000)
+            except Exception:
+                pass
             did = True
     except Exception:
         log.debug("sandbox login step skipped", exc_info=True)
@@ -197,9 +205,9 @@ async def _execute(
     if name in ("wait_5_seconds", "wait"):
         await asyncio.sleep(float(args.get("seconds", 5)) if name == "wait" else 5)
     elif name == "go_back":
-        await page.go_back(wait_until="domcontentloaded", timeout=20000)
+        await page.go_back(wait_until="commit", timeout=20000)
     elif name == "go_forward":
-        await page.go_forward(wait_until="domcontentloaded", timeout=20000)
+        await page.go_forward(wait_until="commit", timeout=20000)
     elif name == "search":
         await page.goto(store_url, wait_until="domcontentloaded", timeout=20000)
     elif name == "navigate":

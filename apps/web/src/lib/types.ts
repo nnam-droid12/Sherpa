@@ -102,7 +102,14 @@ export type RunEvent = {
   [key: string]: unknown;
 };
 
-export type DemoStore = { id: string; name: string; tagline: string; store_url: string; repo: string };
+export type DemoStore = {
+  id: string;
+  name: string;
+  tagline: string;
+  store_url: string;
+  repo: string;
+  recent_run_id?: string | null;
+};
 
 export const CATEGORY_LABELS: Record<string, string> = {
   presentment: "Presentment",

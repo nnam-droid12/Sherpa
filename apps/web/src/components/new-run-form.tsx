@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { DemoStore, Run } from "@/lib/types";
@@ -68,18 +69,24 @@ export function NewRunForm() {
           <p className="text-sm text-muted">Try it on a demo store</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {demos.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => pickDemo(d)}
-                aria-pressed={demoStore === d.id}
-                className={`rounded-xl border px-3 py-2.5 text-left transition hover:border-accent ${
-                  demoStore === d.id ? "border-accent bg-accent/10" : "border-border"
-                }`}
-              >
-                <span className="block text-sm font-medium">Use {d.name}</span>
-                <span className="block text-xs text-muted">{d.tagline}</span>
-              </button>
+              <div key={d.id} className="grid gap-1">
+                <button
+                  type="button"
+                  onClick={() => pickDemo(d)}
+                  aria-pressed={demoStore === d.id}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition hover:border-accent ${
+                    demoStore === d.id ? "border-accent bg-accent/10" : "border-border"
+                  }`}
+                >
+                  <span className="block text-sm font-medium">Use {d.name}</span>
+                  <span className="block text-xs text-muted">{d.tagline}</span>
+                </button>
+                {d.recent_run_id && (
+                  <Link href={`/runs/${d.recent_run_id}`} className="px-1 text-xs text-accent underline-offset-4 hover:underline">
+                    View a recent run instantly →
+                  </Link>
+                )}
+              </div>
             ))}
           </div>
         </div>

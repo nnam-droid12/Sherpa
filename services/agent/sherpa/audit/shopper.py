@@ -34,9 +34,10 @@ GOAL = (
 RULES = (
     "Rules: Stay on this store and PayPal pages. Fill any required checkout form with realistic test details "
     "(name Alex Rivera, 500 Market St, San Francisco, 94105, a delivery date at least a week from today) and leave "
-    "optional fields empty. If a PayPal login page appears, do not type credentials; wait one step, the test "
-    "account is signed in for you. In the PayPal window, choose the default funding and click the button that "
-    "completes the payment. If the page is blank, broken or you cannot find a way to pay after a few attempts, say "
+    "optional fields empty. Pay with a PayPal account, never as a guest: if PayPal shows 'Check out as a guest', "
+    "click its 'Log In' link. If a PayPal login page appears, do not type credentials; wait one step, the test "
+    "account is signed in for you. Do not cancel the PayPal window. In the PayPal window, choose the default "
+    "funding and click the button that completes the payment (for example 'Complete Purchase' or 'Continue'). If the page is blank, broken or you cannot find a way to pay after a few attempts, say "
     "so clearly and stop. When you are done, give a one-paragraph summary starting with SUMMARY:."
 )
 
@@ -139,39 +140,37 @@ async def _sandbox_login(page: Page, email: str, password: str) -> bool:
     if not (urlparse(page.url).hostname or "").endswith("paypal.com") or not email:
         return False
     did = False
-    # PayPal's login page keeps hidden duplicates of its inputs, so only ever target visible ones.
-    email_box = page.locator("#email:visible, input[name='login_email']:visible").first
-    pwd = page.locator("#password:visible, input[name='login_password']:visible").first
     try:
-        # US checkouts can open on "Check out as a guest"; the account login is behind a "Log In" link.
-        guest = page.get_by_text("Check out as a guest")
-        if await guest.count() and await guest.first.is_visible():
-            await (
-                page.get_by_role("link", name="Log In")
-                .or_(page.get_by_role("button", name="Log In"))
-                .first.click()
-            )
-            await page.wait_for_timeout(4000)
-            did = True
-        if await email_box.count() and not await email_box.input_value():
-            await email_box.fill(email)
-            nxt = page.locator("#btnNext:visible").first
-            if await nxt.count():
-                await nxt.click()
-            did = True
-        try:
-            await pwd.wait_for(state="visible", timeout=10000 if did else 1500)
-        except Exception:
-            return did
-        if not await pwd.input_value():
-            await pwd.fill(password)
-            await page.locator("#btnLogin:visible, button[type='submit']:visible").first.click()
-            try:
-                await page.wait_for_load_state("domcontentloaded", timeout=15000)
-                await page.wait_for_timeout(3000)
-            except Exception:
-                pass
-            did = True
+        # PayPal renders some entry pages inside iframes and keeps hidden duplicate inputs,
+        # so search every frame and only ever target visible elements.
+        for frame in page.frames:
+            # US checkouts can open on "Check out as a guest"; the account login is behind "Log In".
+            guest = frame.get_by_text("Check out as a guest")
+            if await guest.count() and await guest.first.is_visible():
+                await frame.get_by_text("Log In", exact=True).last.click()
+                await page.wait_for_timeout(5000)
+                did = True
+                break
+        for frame in page.frames:
+            email_box = frame.locator("#email:visible, input[name='login_email']:visible").first
+            if await email_box.count() and not await email_box.input_value():
+                await email_box.fill(email)
+                nxt = frame.locator("#btnNext:visible").first
+                if await nxt.count():
+                    await nxt.click()
+                did = True
+                break
+        deadline = time.monotonic() + (10 if did else 1.5)
+        while time.monotonic() < deadline:
+            for frame in page.frames:
+                pwd = frame.locator("#password:visible, input[name='login_password']:visible").first
+                if await pwd.count():
+                    if not await pwd.input_value():
+                        await pwd.fill(password)
+                        await frame.locator("#btnLogin:visible, button[type='submit']:visible").first.click()
+                        await page.wait_for_timeout(5000)
+                    return True
+            await page.wait_for_timeout(500)
     except Exception:
         log.debug("sandbox login step skipped", exc_info=True)
     return did

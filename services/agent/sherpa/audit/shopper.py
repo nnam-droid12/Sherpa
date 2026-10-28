@@ -126,13 +126,17 @@ class _Browser:
             for key in ("id", "orderId", "orderID", "order_id"):
                 self._remember(data.get(key))
 
-    @property
-    def size(self) -> tuple[int, int]:
-        vp = self.page.viewport_size or {
-            "width": self.session.device.width,
-            "height": self.session.device.height,
-        }
-        return vp["width"], vp["height"]
+    async def size(self) -> tuple[int, int]:
+        """CSS size of the active page. Popups (PayPal) report no viewport, so measure them directly;
+        model coordinates are relative to the screenshot of this exact page."""
+        vp = self.page.viewport_size
+        if vp:
+            return vp["width"], vp["height"]
+        try:
+            w, h = await self.page.evaluate("() => [window.innerWidth, window.innerHeight]")
+            return int(w), int(h)
+        except Exception:
+            return self.session.device.width, self.session.device.height
 
 
 async def _sandbox_login(page: Page, email: str, password: str) -> bool:
@@ -186,7 +190,7 @@ async def _execute(
 ) -> str | None:
     """Run one computer-use action; returns an error string the model should see, if any."""
     page = b.page
-    w, h = b.size
+    w, h = await b.size()
     key_map = {
         "control": "Control",
         "ctrl": "Control",

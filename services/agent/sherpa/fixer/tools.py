@@ -46,6 +46,14 @@ class Workspace:
             raise ToolError("binary files cannot be written")
         return path
 
+    def peek(self, rel: str) -> str | None:
+        """Current text of a file, or None if it doesn't exist (for streaming diffs to the console)."""
+        try:
+            p = self.resolve(rel)
+        except ToolError:
+            return None
+        return p.read_text(encoding="utf-8", errors="replace") if p.is_file() else None
+
     # --- tools --------------------------------------------------------------
     def list_dir(self, path: str = ".") -> str:
         base = self.resolve(path)

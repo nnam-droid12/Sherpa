@@ -117,3 +117,29 @@ def test_pr_body_has_no_assistant_attribution():
     lowered = body.lower()
     for word in ("gemini", "co-authored", "generated with"):
         assert word not in lowered
+
+
+async def test_file_events_stream_content_and_diffs(ember):
+    from sherpa.fixer.agent import emit_file
+
+    events = []
+
+    async def emit(kind, **data):
+        events.append((kind, data))
+
+    await emit_file(emit, ember, "server.js", "read", None)
+    before = ember.peek("server.js")
+    ember.apply_patch(
+        "server.js",
+        "const PORT = process.env.PORT || 8080;",
+        "const PORT = Number(process.env.PORT) || 8080;",
+    )
+    await emit_file(emit, ember, "server.js", "edit", before)
+    ember.write_file("routes/new.js", "module.exports = 1;\n")
+    await emit_file(emit, ember, "routes/new.js", "create", None)
+
+    read, edit, create = (d for _, d in events)
+    assert read["action"] == "read" and "express" in read["content"] and read["diff"] == ""
+    assert edit["diff"].startswith("diff --git a/server.js b/server.js")
+    assert "+const PORT = Number(process.env.PORT) || 8080;" in edit["diff"]
+    assert create["action"] == "create" and "+module.exports = 1;" in create["diff"]

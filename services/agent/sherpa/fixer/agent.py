@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import logging
 import time
@@ -72,6 +73,31 @@ class FixOutcome:
     files_changed: list[str] = field(default_factory=list)
     unresolved: list[str] = field(default_factory=list)
     seconds: float = 0.0
+
+
+MAX_FILE_EVENT = 30_000
+
+
+async def emit_file(emit: Emit, ws: Workspace, path: str, action: str, before: str | None) -> None:
+    """Stream the file the agent is working on so the console can show its code, or a diff of an edit."""
+    after = ws.peek(path)
+    if after is None:
+        return
+    rel = path.replace("\\", "/").lstrip("/")
+    diff = ""
+    if action != "read":
+        lines = difflib.unified_diff(
+            (before or "").splitlines(), after.splitlines(), f"a/{rel}", f"b/{rel}", lineterm="", n=3
+        )
+        diff = f"diff --git a/{rel} b/{rel}\n" + "\n".join(lines)
+    await emit(
+        "file",
+        path=rel,
+        action=action,
+        content=after[:MAX_FILE_EVENT],
+        truncated=len(after) > MAX_FILE_EVENT,
+        diff=diff[:MAX_FILE_EVENT],
+    )
 
 
 async def load_references() -> str:
@@ -191,12 +217,17 @@ async def run_fixer(
                     result = ws.list_dir(args.get("path", "."))
                 elif call.name == "read_file":
                     result = ws.read_file(args["path"], args.get("start_line"), args.get("end_line"))
+                    await emit_file(emit, ws, args["path"], "read", None)
                 elif call.name == "search_code":
                     result = ws.search_code(args["pattern"], args.get("path_glob"))
                 elif call.name == "write_file":
+                    before = ws.peek(args["path"])
                     result = ws.write_file(args["path"], args["content"])
+                    await emit_file(emit, ws, args["path"], "create" if before is None else "edit", before)
                 elif call.name == "apply_patch":
+                    before = ws.peek(args["path"])
                     result = ws.apply_patch(args["path"], args["old"], args["new"])
+                    await emit_file(emit, ws, args["path"], "edit", before)
                 elif call.name == "run_build":
                     result = await ws.run_build()
                     await emit(

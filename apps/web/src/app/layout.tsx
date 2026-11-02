@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { SiteHeader } from "@/components/site-header";
+import Link from "next/link";
+import { Logo, SiteHeader } from "@/components/site-header";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-face" });
@@ -27,6 +28,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-dvh font-sans antialiased">
         <SiteHeader />
         <main className="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">{children}</main>
+        <footer className="border-t border-border">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <Logo />
+            <p>PayPal sandbox only. Built on Gemini Enterprise Agent Platform, KERNEL and Google Cloud Run.</p>
+            <nav className="flex gap-4" aria-label="Footer">
+              <Link href="/dashboard" className="hover:text-fg">
+                Dashboard
+              </Link>
+              <a href="https://github.com/nnam-droid12/Sherpa" className="hover:text-fg">
+                GitHub
+              </a>
+              <a href="https://github.com/nnam-droid12/Sherpa/blob/main/LICENSE" className="hover:text-fg">
+                MIT license
+              </a>
+            </nav>
+          </div>
+        </footer>
       </body>
     </html>
   );

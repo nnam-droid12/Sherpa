@@ -14,6 +14,10 @@ from sherpa.config import get_settings
 log = logging.getLogger(__name__)
 
 
+STALE_SECONDS = 240  # a running stage with no heartbeat for this long was orphaned by a restart
+INTERRUPTED = "Interrupted: the server running this stage restarted. Use Retry to run it again."
+
+
 class RunStore:
     """Persists runs/events. Falls back to memory when Firestore is unavailable (tests, local)."""
 
@@ -56,13 +60,40 @@ class RunStore:
         await self._publish(run_id, {"type": "run", "run": run})
         return run
 
+    async def heartbeat(self, run_id: str) -> None:
+        """Cheap liveness signal for a running stage (not broadcast to subscribers)."""
+        now = time.time()
+        self._runs.setdefault(run_id, {"id": run_id})["heartbeat"] = now
+        if self._db:
+            try:
+                await self._db.collection("runs").document(run_id).set({"heartbeat": now}, merge=True)
+            except Exception:
+                log.warning("heartbeat write failed", exc_info=True)
+
+    async def settle(self, run: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Mark a stage whose worker vanished (no heartbeat) as failed, so it can be retried."""
+        if not run:
+            return run
+        status = str(run.get("status", ""))
+        if not (status.endswith(":running") or status == "queued"):
+            return run
+        last = run.get("heartbeat") or run.get("updated_at") or run.get("created_at") or 0
+        if time.time() - last < STALE_SECONDS:
+            return run
+        stage = run.get("stage") or status.split(":")[0] or "audit"
+        if stage == "queued":
+            stage = "audit"
+        return await self.update_run(
+            run["id"], status=f"{stage}:failed", error=INTERRUPTED, stop_requested=False
+        )
+
     async def get_run(self, run_id: str) -> dict[str, Any] | None:
-        if run_id in self._runs:
-            return self._runs[run_id]
+        if run_id in self._runs and "created_at" in self._runs[run_id]:
+            return await self.settle(self._runs[run_id])
         if self._db:
             snap = await self._db.collection("runs").document(run_id).get()
             if snap.exists:
-                return snap.to_dict()
+                return await self.settle(snap.to_dict())
         return None
 
     async def fresh_run(self, run_id: str) -> dict[str, Any] | None:
@@ -77,7 +108,7 @@ class RunStore:
             from google.cloud import firestore
 
             query = self._db.collection("runs").order_by("created_at", direction=firestore.Query.DESCENDING)
-            return [d.to_dict() async for d in query.limit(limit).stream()]
+            return [await self.settle(d.to_dict()) async for d in query.limit(limit).stream()]
         return sorted(self._runs.values(), key=lambda r: r["created_at"], reverse=True)[:limit]
 
     # --- events -----------------------------------------------------------

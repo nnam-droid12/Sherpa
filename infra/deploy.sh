@@ -61,7 +61,7 @@ deploy_agent() {
     PAYPAL_WEBHOOK_ID PAYPAL_SANDBOX_BUYER_EMAIL PAYPAL_SANDBOX_BUYER_PASSWORD GITHUB_TOKEN)"
   gcloud run deploy sherpa-agent --source "$ROOT/services/agent" --region "$REGION" \
     --service-account "$SA" --allow-unauthenticated --memory 2Gi --cpu 2 --timeout 3600 \
-    --concurrency 20 --min-instances 0 --max-instances 3 --no-cpu-throttling \
+    --concurrency 40 --min-instances 1 --max-instances 1 --no-cpu-throttling \
     --set-env-vars "SHERPA_ENV=cloud,GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global},GCP_REGION=$REGION,$demo_env" \
     ${secrets:+--set-secrets "$secrets"} --quiet
 }

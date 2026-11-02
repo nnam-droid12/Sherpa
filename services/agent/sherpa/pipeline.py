@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 _tasks: set[asyncio.Task] = set()
 MAX_DIFF = 150_000
 STOP_POLL_SECONDS = 8
+HEARTBEAT_SECONDS = 45
 
 
 def add_usage(usage: dict[str, float] | None, patch: dict[str, Any], seconds: float) -> dict[str, float]:
@@ -52,8 +53,13 @@ def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[
 
     async def watch_for_stop(work: asyncio.Task) -> None:
         # A stop can be requested on any agent instance, so poll the shared run document.
+        # The same loop writes a heartbeat, so a stage orphaned by a server restart can be detected.
+        last_beat = 0.0
         while not work.done():
             await asyncio.sleep(STOP_POLL_SECONDS)
+            if time.monotonic() - last_beat > HEARTBEAT_SECONDS:
+                await store.heartbeat(run_id)
+                last_beat = time.monotonic()
             fresh = await store.fresh_run(run_id)
             if fresh and fresh.get("stop_requested"):
                 work.cancel()
@@ -61,7 +67,12 @@ def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[
 
     async def wrapper() -> None:
         await store.update_run(
-            run_id, status=f"{stage}:running", stage=stage, error=None, stop_requested=False
+            run_id,
+            status=f"{stage}:running",
+            stage=stage,
+            error=None,
+            stop_requested=False,
+            heartbeat=time.time(),
         )
         started = time.monotonic()
         work = asyncio.create_task(job())
@@ -110,8 +121,13 @@ async def fix_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
     try:
         base = await github.default_branch(repo)
         ws = Workspace(root)
+        # Agent-readiness (catalog feed, Cart API) is its own stage; keep the checkout PR focused.
+        checkout_audit = {
+            **run["audit"],
+            "findings": [f for f in run["audit"]["findings"] if f.get("category") != "agent_readiness"],
+        }
         outcome = await run_fixer(
-            ws, run["audit"]["findings"], emit, store_type=run.get("store_type", "auto")
+            ws, checkout_audit["findings"], emit, store_type=run.get("store_type", "auto")
         )
         if not ws.changed:
             raise RuntimeError("The fixer made no changes.")
@@ -133,7 +149,7 @@ async def fix_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
             head=branch,
             base=base,
             title="Upgrade PayPal checkout: JS SDK v6, Venmo, Pay Later and safer payments",
-            body=pr_body(run["audit"], outcome, run["store_url"]),
+            body=pr_body(checkout_audit, outcome, run["store_url"]),
         )
         await emit("log", message=f"Opened pull request #{pr['number']}")
         return {

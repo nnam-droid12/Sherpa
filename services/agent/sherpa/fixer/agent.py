@@ -60,7 +60,8 @@ creating the order, and never trust a total sent by the browser. Verify the capt
 rejects unverified events with 400, and handles PAYMENT.CAPTURE.COMPLETED, PAYMENT.CAPTURE.DENIED and \
 CHECKOUT.ORDER.APPROVED.
 7. Handle failures gracefully: on a declined or failed payment (including INSTRUMENT_DECLINED) show a visible message \
-in an element with role="alert" and a "Try again" path; never blank the page."""
+in an element with role="alert" and a "Try again" path; never blank the page.
+Do not add a catalog feed or Cart API endpoints in this change; a separate agent-ready step does that."""
 
 
 @dataclass

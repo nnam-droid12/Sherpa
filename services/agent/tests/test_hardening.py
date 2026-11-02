@@ -102,3 +102,18 @@ async def test_stop_request_cancels_a_running_stage(monkeypatch):
     final = await store.get_run(run["id"])
     assert final["status"] == "fix:failed" and final["error"] == "Stopped by the user."
     assert cleaned.is_set()
+
+
+async def test_orphaned_stage_is_marked_interrupted_and_retryable():
+    import time as _time
+
+    from sherpa.store.runs import INTERRUPTED, STALE_SECONDS, RunStore
+
+    store = RunStore(use_firestore=False)
+    run = await store.create_run({"store_url": "https://store.example"})
+    await store.update_run(run["id"], status="fix:running", stage="fix", heartbeat=_time.time())
+    assert (await store.get_run(run["id"]))["status"] == "fix:running"
+    store._runs[run["id"]]["heartbeat"] = _time.time() - STALE_SECONDS - 5
+    store._runs[run["id"]]["updated_at"] = _time.time() - STALE_SECONDS - 5
+    settled = await store.get_run(run["id"])
+    assert settled["status"] == "fix:failed" and settled["error"] == INTERRUPTED

@@ -88,8 +88,11 @@ deploy_stores() {
   done
 }
 
-ensure_service_account
-ensure_registry
+# IAM and registry setup only need to run once per project; re-run with SETUP=1 to repair them.
+if [ "${SETUP:-0}" = "1" ] || ! gcloud iam service-accounts describe "$SA" >/dev/null 2>&1; then
+  ensure_service_account
+  ensure_registry
+fi
 case "$TARGET" in
   agent) deploy_agent ;;
   web) deploy_web ;;

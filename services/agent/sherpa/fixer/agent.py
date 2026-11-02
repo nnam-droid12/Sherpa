@@ -76,6 +76,7 @@ class FixOutcome:
 
 
 MAX_FILE_EVENT = 30_000
+PRELOAD_BYTES = 150_000
 
 
 async def emit_file(emit: Emit, ws: Workspace, path: str, action: str, before: str | None) -> None:
@@ -157,11 +158,23 @@ async def run_fixer(
     settings = get_settings()
     started = time.monotonic()
     outcome = FixOutcome()
+    if settings.env != "test":
+        ws.prewarm()  # npm install runs while the agent plans, so the first build doesn't wait for it
     references = await load_references()
     tree = ws.list_dir(".")
+    # Hand the agent the whole (small) store up front: reading files one call at a time, each with
+    # high thinking, was most of the fixer's wall-clock time.
+    sources = sc.read_source_tree(ws.root, max_bytes=PRELOAD_BYTES)
+    sources.pop("package-lock.json", None)
+    preloaded = "\n\n".join(f"### {path}\n```\n{text}\n```" for path, text in sources.items())
+    for path in sources:
+        await emit_file(emit, ws, path, "read", None)
     prompt = (
         f"{task or REQUIRED_FIXES}\n\n"
         f"Store type hint: {store_type}. Files in the store directory:\n{tree}\n\n"
+        "The current contents of every source file are included below, so you do not need to read them "
+        "again; make several edits per turn where you can.\n\n"
+        f"{preloaded}\n\n"
         f"Audit findings (JSON):\n{json.dumps(findings, indent=1)[:12000]}\n\n"
         f"PayPal best-practice references (authoritative):\n{references[:60000]}"
     )

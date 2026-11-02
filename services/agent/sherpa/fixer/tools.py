@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -31,6 +33,8 @@ class Workspace:
     last_build_ok: bool | None = None
     last_build_output: str = ""
     installed_hash: str = ""
+    _install_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    _prewarm: asyncio.Task | None = field(default=None, repr=False)
 
     def resolve(self, rel: str, *, write: bool = False) -> Path:
         rel = (rel or ".").replace("\\", "/").lstrip("/")
@@ -137,11 +141,7 @@ class Workspace:
         self.last_build_ok = None
         return f"patched {path}"
 
-    async def run_build(self) -> str:
-        pkg = self.root / "package.json"
-        if not pkg.exists():
-            raise ToolError("no package.json in the store directory")
-        scripts = json.loads(pkg.read_text(encoding="utf-8")).get("scripts", {})
+    def _env(self) -> dict[str, str]:
         env = {k: v for k, v in os.environ.items() if not re.search(r"KEY|SECRET|TOKEN|PASSWORD", k)}
         env.update(
             {
@@ -151,13 +151,40 @@ class Workspace:
                 "npm_config_fund": "false",
             }
         )
-        logs = []
-        install = ["npm", "ci"] if (self.root / "package-lock.json").exists() else ["npm", "install"]
-        code, out = await run(*install, cwd=self.root, timeout=420, env=env)
-        if code != 0 and install[1] == "ci":
-            code, out = await run("npm", "install", cwd=self.root, timeout=420, env=env)
-        logs.append(f"$ npm install -> {code}\n{out[-1500:]}")
-        ok = code == 0
+        return env
+
+    async def install_deps(self) -> tuple[bool, str]:
+        """npm install, skipped when package.json and the lockfile haven't changed since the last install."""
+        async with self._install_lock:
+            pkg, lock = self.root / "package.json", self.root / "package-lock.json"
+            if not pkg.exists():
+                return False, "no package.json"
+            deps_hash = hashlib.sha256(
+                pkg.read_bytes() + (lock.read_bytes() if lock.exists() else b"")
+            ).hexdigest()
+            if deps_hash == self.installed_hash and (self.root / "node_modules").exists():
+                return True, "dependencies unchanged; install skipped"
+            install = ["npm", "ci"] if lock.exists() else ["npm", "install"]
+            code, out = await run(*install, cwd=self.root, timeout=420, env=self._env())
+            if code != 0 and install[1] == "ci":
+                code, out = await run("npm", "install", cwd=self.root, timeout=420, env=self._env())
+            if code == 0:
+                self.installed_hash = deps_hash
+            return code == 0, out[-1500:]
+
+    def prewarm(self) -> None:
+        """Start installing dependencies in the background while the agent reads and plans."""
+        if self._prewarm is None and (self.root / "package.json").exists():
+            self._prewarm = asyncio.create_task(self.install_deps())
+
+    async def run_build(self) -> str:
+        pkg = self.root / "package.json"
+        if not pkg.exists():
+            raise ToolError("no package.json in the store directory")
+        scripts = json.loads(pkg.read_text(encoding="utf-8")).get("scripts", {})
+        env = self._env()
+        ok, out = await self.install_deps()
+        logs = [f"$ npm install -> {'ok' if ok else 'failed'}\n{out}"]
         for script in ("build", "test"):
             if ok and script in scripts:
                 code, out = await run("npm", "run", script, cwd=self.root, timeout=420, env=env)

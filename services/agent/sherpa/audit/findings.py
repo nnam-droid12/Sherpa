@@ -136,6 +136,7 @@ async def write_findings(findings: list[Finding], context: dict[str, Any]) -> li
                 response_mime_type="application/json",
                 response_schema=_WordingList,
                 temperature=0.2,
+                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
             ),
         )
         parsed = (

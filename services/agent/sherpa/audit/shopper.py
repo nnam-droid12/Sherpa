@@ -43,6 +43,7 @@ RULES = (
 
 ORDER_ID_RE = re.compile(r"^[A-Z0-9]{17}$")
 KEEP_SCREENSHOT_TURNS = 3
+CRASH_STOP = 2  # stop the shopper once the same checkout has crashed this many times
 
 
 @dataclass
@@ -310,8 +311,8 @@ async def run_shopper(
     *,
     extra_hosts: set[str] | None = None,
     save_shot: Callable[[bytes], Awaitable[str]] | None = None,
-    max_steps: int = 60,
-    timeout_s: int = 720,
+    max_steps: int = 30,
+    timeout_s: int = 300,
     goal: str = GOAL,
     rules: str = RULES,
     start_url: str | None = None,
@@ -351,6 +352,7 @@ async def run_shopper(
                 )
             ]
             checkout_seen_at: int | None = None
+            crash_hits = 0
             clicks_since_checkout = 0
 
             for n in range(1, max_steps + 1):
@@ -402,6 +404,7 @@ async def run_shopper(
                     result.probes.append(probe)
                     if probe.get("crashed"):
                         result.crashed = True
+                        crash_hits += 1
                     if probe.get("blank") and n > 1:
                         result.blank_page = True
                     if probe.get("paypal_visible"):
@@ -457,6 +460,19 @@ async def run_shopper(
                         )
                     )
                 if stop:
+                    break
+                if crash_hits >= CRASH_STOP:
+                    # The crash is captured with screenshots; retrying only burns minutes.
+                    result.summary = result.summary or (
+                        "The checkout crashed with an application error each time I tried to continue, "
+                        "so I could not reach a payment step."
+                    )
+                    await emit(
+                        "narration",
+                        device=device,
+                        step=n,
+                        text="Checkout crashed again; evidence captured, stopping.",
+                    )
                     break
                 history.append(types.Content(role="user", parts=responses))
                 _prune_screenshots(history)

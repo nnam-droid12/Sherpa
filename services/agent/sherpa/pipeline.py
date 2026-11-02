@@ -100,7 +100,10 @@ async def fix_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
         branch = f"sherpa/fix-{name.removeprefix('sherpa-demo-')}-{run_id}"
         await emit("log", message=f"Committing {len(outcome.files_changed)} files to {branch}")
         sha = await github.commit_and_push(
-            root, branch, "fix(checkout): upgrade PayPal to JS SDK v6 and harden payments"
+            root,
+            branch,
+            "fix(checkout): upgrade PayPal to JS SDK v6 and harden payments",
+            paths=outcome.files_changed,
         )
         diff = await github.git(root, "show", "--format=", "--no-color", "HEAD")
         pr = await github.open_pr(
@@ -181,7 +184,10 @@ async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any
         if not ws.changed or not outcome.build_ok:
             raise RuntimeError("The agent-ready changes did not build; nothing was pushed.")
         sha = await github.commit_and_push(
-            root, fix["branch"], "feat(agent-ready): add catalog feed and PayPal Cart API v1 endpoints"
+            root,
+            fix["branch"],
+            "feat(agent-ready): add catalog feed and PayPal Cart API v1 endpoints",
+            paths=outcome.files_changed,
         )
         diff = await github.git(root, "show", "--format=", "--no-color", "HEAD")
     finally:

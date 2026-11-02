@@ -51,7 +51,14 @@ async def git(workdir: Path, *args: str, timeout: int = 120) -> str:
 async def commit_and_push(workdir: Path, branch: str, message: str, paths: list[str] | None = None) -> str:
     """Create `branch`, commit the given paths (or everything) and push. Returns the commit sha."""
     await git(workdir, "checkout", "-B", branch)
-    await git(workdir, "add", "--", *(paths or ["."]))
+    # Never commit dependencies or build output, even if the repo lacks a .gitignore.
+    exclude = workdir / ".git" / "info" / "exclude"
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    exclude.write_text(
+        "\n".join(["node_modules/", ".next/", "dist/", "build/", "coverage/", ".env", ".env.*"]) + "\n",
+        encoding="utf-8",
+    )
+    await git(workdir, "add", "--all", "--", *(paths or ["."]))
     name, email = AUTHOR
     await git(workdir, "-c", f"user.name={name}", "-c", f"user.email={email}", "commit", "-m", message)
     await git(workdir, "push", "--force", "origin", f"HEAD:refs/heads/{branch}", timeout=180)

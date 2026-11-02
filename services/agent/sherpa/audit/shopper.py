@@ -185,6 +185,19 @@ async def _screenshot(page: Page) -> bytes:
     return await page.screenshot(type="png", mask=mask, animations="disabled")
 
 
+async def _active_screenshot(b: _Browser) -> bytes:
+    """Screenshot the active page; the PayPal popup closes itself after approval, so fall back to the store."""
+    if b.page.is_closed():
+        b.page = b.main
+    try:
+        return await _screenshot(b.page)
+    except Exception:
+        if b.page is b.main:
+            raise
+        b.page = b.main
+        return await _screenshot(b.page)
+
+
 async def _execute(
     b: _Browser, name: str, args: dict[str, Any], allowed_hosts: set[str], store_url: str
 ) -> str | None:
@@ -325,7 +338,7 @@ async def run_shopper(
             b = _Browser(session, store_host)
             await b.page.goto(start_url or store_url, wait_until="domcontentloaded")
 
-            shot = await _screenshot(b.page)
+            shot = await _active_screenshot(b)
             history: list[types.Content] = [
                 types.Content(
                     role="user",
@@ -402,7 +415,7 @@ async def run_shopper(
                     ):
                         clicks_since_checkout += 1
 
-                    shot = await _screenshot(b.page)
+                    shot = await _active_screenshot(b)
                     shot_id = await save_shot(_jpeg(shot)) if save_shot else None
                     safe_args = {
                         k: ("•••" if k == "text" and "paypal.com" in b.page.url else v)

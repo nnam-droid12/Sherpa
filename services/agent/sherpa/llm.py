@@ -25,8 +25,9 @@ def _retryable(exc: BaseException) -> bool:
 
 @retry(
     reraise=True,
-    stop=stop_after_attempt(4),
-    wait=wait_exponential(multiplier=1, max=20),
+    stop=stop_after_attempt(8),
+    # Vertex 429s (quota) clear within a minute or two, so be patient rather than fail a long run.
+    wait=wait_exponential(multiplier=2, min=4, max=60),
     retry=retry_if_exception(_retryable),
 )
 async def generate(

@@ -45,3 +45,29 @@ async def test_preview_api_merges_extra_headers(monkeypatch):
     )
     assert out == {"ok": True}
     assert seen == {"Authorization": "Bearer tok", "Content-Type": "application/gzip"}
+
+
+async def test_screenshot_falls_back_to_store_when_paypal_popup_closed():
+    from types import SimpleNamespace
+
+    from sherpa.audit import shopper
+
+    class FakePage:
+        def __init__(self, closed, data):
+            self.closed, self.data = closed, data
+
+        def is_closed(self):
+            return self.closed
+
+        def locator(self, _):
+            return None
+
+        async def screenshot(self, **_):
+            if self.closed:
+                raise RuntimeError("Target page, context or browser has been closed")
+            return self.data
+
+    main = FakePage(False, b"store")
+    b = SimpleNamespace(main=main, page=FakePage(True, b"popup"))
+    assert await shopper._active_screenshot(b) == b"store"
+    assert b.page is main

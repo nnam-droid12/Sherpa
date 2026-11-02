@@ -50,7 +50,10 @@ export function Timeline({ events, device }: { events: RunEvent[]; device?: "des
       ["step", "sandbox_login", "safety", "shopper_done", "narration", "warning", "error"].includes(e.kind) &&
       (!device || !e.device || e.device === device),
   );
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [items.length]);
+  useEffect(() => {
+    // Braces matter: scrollIntoView returns a Promise in recent browsers, and an effect must not return one.
+    end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [items.length]);
 
   if (!items.length) {
     return <p className="p-4 text-sm text-muted">Waiting for the shopper to start…</p>;

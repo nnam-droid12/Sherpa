@@ -22,7 +22,11 @@ export function useRun(runId: string, initial?: Run | null) {
       seen.current.add(ev.seq);
       setEvents((prev) => [...prev, ev]);
     });
-    es.addEventListener("run", (e) => setRun(JSON.parse((e as MessageEvent).data) as Run));
+    // Merge rather than replace, so a partial update can never drop fields the page relies on.
+    es.addEventListener("run", (e) => {
+      const next = JSON.parse((e as MessageEvent).data) as Partial<Run>;
+      setRun((prev) => ({ ...(prev ?? {}), ...next }) as Run);
+    });
     return () => es.close();
   }, [runId]);
 

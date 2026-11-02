@@ -14,17 +14,16 @@ _Last updated: 2026-11-02_
 
 - **Audit:** every planted flaw is detected on both stores (9/9 and 7/7). Ember & Oak scored 15 on five consecutive runs; Lumen scored between 18 and 23.
 - **Fix:** Ember & Oak [PR #1](https://github.com/nnam-droid12/sherpa-demo-ember-oak/pull/1) has a passing build and no unresolved self-checks.
-- **Verify:** Ember & Oak went from 15 to 86 on the preview, with sandbox order `2FX73165U33387701` `COMPLETED` and a scorecard comment on the PR.
+- **Verify:** Ember & Oak went from 15 to **100** on the preview. Desktop and mobile both paid, sandbox order `54Y07191J3531851G` is `COMPLETED`, and the scorecard is commented on the PR.
+- **Agent-ready:** Ember & Oak passes 8/8 Cart API contract tests on the preview. The AI buyer agent found the tent, resolved the store's "shipping address required" validation issue, approved the payment in a cloud browser and checked out; order `9G790614RT203802M` is `COMPLETED` for USD 349.00.
 - **Sandbox login:** works on both of PayPal's entry pages (guest-first and direct login).
 
 ## In progress
 
-- Agent-ready on Ember & Oak (first live run).
 - The Lumen Bakehouse fix → verify → agent-ready flow on the new faster fixer.
 
 ## Next
 
-- Re-verify Ember & Oak after the mobile popup fix, so the mobile payment also completes and the score exceeds 90.
 - A Playwright smoke test of the console in CI, and an accessibility pass.
 - Make the Sherpa repo public before submission.
 - Record the demo video, following `docs/DEVPOST.md`.

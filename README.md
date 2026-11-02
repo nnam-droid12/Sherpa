@@ -35,7 +35,7 @@ Two intentionally flawed fictional stores ship with Sherpa. Every planted flaw i
 
 | Store | Planted flaws found by the audit | Score before | Score after |
 |---|---|---|---|
-| Ember & Oak (HTML/JS + Express) | 9 / 9 | 15 | **86**, with a real sandbox payment `COMPLETED` on the preview ([PR #1](https://github.com/nnam-droid12/sherpa-demo-ember-oak/pull/1)) |
+| Ember & Oak (HTML/JS + Express) | 9 / 9 | 15 | **100**: desktop and mobile sandbox payments `COMPLETED`; Cart API contract tests 8/8; AI buyer agent order `COMPLETED` ([PR #1](https://github.com/nnam-droid12/sherpa-demo-ember-oak/pull/1)) |
 | Lumen Bakehouse (Next.js) | 7 / 7 | 18 | _pending live verify_ |
 
 ## Architecture

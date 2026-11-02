@@ -33,10 +33,10 @@ export function LiveView({ events, running, phase }: { events: RunEvent[]; runni
 
   const current = info[device];
   const showLive = running && current.live && !current.done;
-  const frame = device === "mobile" ? "mx-auto aspect-[390/844] max-h-[640px]" : "aspect-[1440/900] w-full";
+  const frame = device === "mobile" ? "mx-auto aspect-[390/844] w-full max-w-[400px]" : "aspect-[1440/900] w-full";
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+    <div className="grid gap-4">
       <section className="grid content-start gap-3 rounded-2xl border border-border bg-surface p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div role="tablist" aria-label="Device" className="flex rounded-lg bg-surface-2 p-1 text-sm">
@@ -69,7 +69,8 @@ export function LiveView({ events, running, phase }: { events: RunEvent[]; runni
         <div className={`overflow-hidden rounded-xl border border-border bg-bg ${frame}`}>
           {showLive ? (
             <iframe
-              src={current.live}
+              // Read-only so viewers can watch without accidentally steering the AI shopper.
+              src={`${current.live}${current.live?.includes("?") ? "&" : "?"}readOnly=true`}
               title={`Live ${device} browser`}
               className="h-full w-full"
               allow="clipboard-read; clipboard-write"
@@ -84,8 +85,11 @@ export function LiveView({ events, running, phase }: { events: RunEvent[]; runni
           )}
         </div>
       </section>
-      <section className="max-h-[640px] overflow-y-auto rounded-2xl border border-border bg-surface-2/50">
-        <h3 className="sticky top-0 z-10 border-b border-border bg-surface px-4 py-2.5 text-sm font-medium">Shopper timeline</h3>
+      <section className="max-h-[520px] overflow-y-auto rounded-2xl border border-border bg-surface-2/50">
+        <h3 className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-4 py-2.5 text-sm font-medium">
+          <span>Shopper timeline</span>
+          <span className="text-xs font-normal capitalize text-muted">{device}</span>
+        </h3>
         <Timeline events={phaseEvents} device={device} />
       </section>
     </div>

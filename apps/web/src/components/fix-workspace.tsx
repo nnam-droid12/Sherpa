@@ -13,10 +13,11 @@ type FileState = {
   seq: number;
 };
 
+// Editor palette (GitHub dark), fixed regardless of the site theme.
 const BADGE: Record<FileState["action"], string> = {
-  read: "bg-surface-2 text-muted",
-  edit: "bg-warn/15 text-warn",
-  create: "bg-good/15 text-good",
+  read: "bg-[#21262d] text-[#8b949e]",
+  edit: "bg-[#bb800926] text-[#e3b341]",
+  create: "bg-[#2ea04326] text-[#56d364]",
 };
 
 const LABEL: Record<FileState["action"], string> = { read: "read", edit: "edited", create: "new" };
@@ -24,14 +25,14 @@ const LABEL: Record<FileState["action"], string> = { read: "read", edit: "edited
 function CodeView({ content, truncated }: { content: string; truncated: boolean }) {
   const lines = content.split("\n");
   return (
-    <pre className="max-h-[560px] overflow-auto text-xs leading-5">
+    <pre className="max-h-[560px] overflow-auto bg-[#0d1117] py-2 text-xs leading-5 text-[#c9d1d9]">
       {lines.map((l, i) => (
         <div key={i} className="flex font-mono">
-          <span className="w-10 shrink-0 select-none pr-3 text-right text-muted/70">{i + 1}</span>
+          <span className="w-12 shrink-0 select-none pr-4 text-right text-[#6e7681]">{i + 1}</span>
           <span className="whitespace-pre pr-4">{l || " "}</span>
         </div>
       ))}
-      {truncated && <div className="px-4 py-2 text-muted">… file truncated for display</div>}
+      {truncated && <div className="px-4 py-2 text-[#8b949e]">… file truncated for display</div>}
     </pre>
   );
 }
@@ -91,9 +92,14 @@ export function FixWorkspace({ events, phase }: { events: RunEvent[]; phase: str
       {files.length === 0 ? (
         <p className="text-sm text-muted">Waiting for the coding agent to open the repository…</p>
       ) : (
-        <div className="grid overflow-hidden rounded-xl border border-border md:grid-cols-[260px_1fr]">
-          <nav aria-label="Files" className="max-h-[600px] overflow-y-auto border-b border-border bg-surface-2/40 md:border-b-0 md:border-r">
-            <p className="sticky top-0 border-b border-border bg-surface px-3 py-2 text-xs text-muted">
+        <div className="grid overflow-hidden rounded-xl border border-[#30363d] bg-[#0d1117] shadow-lg md:grid-cols-[260px_1fr]">
+          <nav aria-label="Files" className="max-h-[600px] overflow-y-auto border-b border-[#30363d] bg-[#010409] md:border-b-0 md:border-r">
+            <p className="sticky top-0 flex items-center gap-2 border-b border-[#30363d] bg-[#010409] px-3 py-2 text-xs text-[#8b949e]">
+              <span className="flex gap-1" aria-hidden>
+                <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+                <span className="size-2.5 rounded-full bg-[#febc2e]" />
+                <span className="size-2.5 rounded-full bg-[#28c840]" />
+              </span>
               {files.length} files · {changed} changed
             </p>
             <ul>
@@ -101,8 +107,8 @@ export function FixWorkspace({ events, phase }: { events: RunEvent[]; phase: str
                 <li key={f.path}>
                   <button
                     onClick={() => setPicked(f.path)}
-                    className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left font-mono text-xs transition hover:bg-surface-2 ${
-                      current?.path === f.path ? "bg-accent/10 text-fg" : "text-muted"
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left font-mono text-xs transition hover:bg-[#161b22] ${
+                      current?.path === f.path ? "bg-[#1f6feb33] text-[#e6edf3]" : "text-[#8b949e]"
                     }`}
                   >
                     <span className="truncate" title={f.path}>
@@ -116,20 +122,20 @@ export function FixWorkspace({ events, phase }: { events: RunEvent[]; phase: str
               ))}
             </ul>
           </nav>
-          <section className="min-w-0 bg-surface">
+          <section className="min-w-0 bg-[#0d1117]">
             {current && (
               <>
-                <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-                  <span className="truncate font-mono text-xs">{current.path}</span>
+                <div className="flex items-center justify-between gap-2 border-b border-[#30363d] bg-[#161b22] px-3 py-2">
+                  <span className="truncate font-mono text-xs text-[#e6edf3]">{current.path}</span>
                   {current.action !== "read" && (
-                    <div className="flex rounded-md bg-surface-2 p-0.5 text-xs" role="tablist" aria-label="View">
+                    <div className="flex rounded-md bg-[#0d1117] p-0.5 text-xs" role="tablist" aria-label="View">
                       {(["diff", "code"] as const).map((m) => (
                         <button
                           key={m}
                           role="tab"
                           aria-selected={mode === m}
                           onClick={() => setMode(m)}
-                          className={`rounded px-2 py-0.5 capitalize ${mode === m ? "bg-surface shadow-sm" : "text-muted"}`}
+                          className={`rounded px-2 py-0.5 capitalize ${mode === m ? "bg-[#21262d] text-[#e6edf3]" : "text-[#8b949e]"}`}
                         >
                           {m === "diff" ? "Changes" : "Full file"}
                         </button>

@@ -1,4 +1,4 @@
-/** Minimal unified-diff renderer, grouped by file. */
+/** Unified-diff renderer in a dark, editor-style theme, grouped by file. */
 export function DiffView({ diff }: { diff: string }) {
   const files: { name: string; lines: string[] }[] = [];
   for (const line of diff.split("\n")) {
@@ -9,26 +9,39 @@ export function DiffView({ diff }: { diff: string }) {
       files[files.length - 1].lines.push(line);
     }
   }
-  if (!files.length) return <p className="text-sm text-muted">No diff available.</p>;
+  if (!files.length) return <p className="text-sm text-[#8b949e]">No changes.</p>;
   return (
     <div className="grid gap-3">
-      {files.map((f) => (
-        <details key={f.name} className="overflow-hidden rounded-xl border border-border bg-surface" open={files.length <= 4}>
-          <summary className="cursor-pointer bg-surface-2 px-3 py-2 font-mono text-xs">{f.name}</summary>
-          <pre className="max-h-96 overflow-auto text-xs leading-5">
-            {f.lines.map((l, i) => (
-              <div
-                key={i}
-                className={`px-3 font-mono ${
-                  l.startsWith("+") ? "bg-good/10 text-good" : l.startsWith("-") ? "bg-bad/10 text-bad" : l.startsWith("@@") ? "text-accent" : ""
-                }`}
-              >
-                {l || " "}
-              </div>
-            ))}
-          </pre>
-        </details>
-      ))}
+      {files.map((f) => {
+        const added = f.lines.filter((l) => l.startsWith("+")).length;
+        const removed = f.lines.filter((l) => l.startsWith("-")).length;
+        return (
+          <details key={f.name} className="overflow-hidden rounded-xl border border-[#30363d] bg-[#0d1117]" open={files.length <= 4}>
+            <summary className="flex cursor-pointer items-center justify-between gap-3 border-b border-[#30363d] bg-[#161b22] px-3 py-2 font-mono text-xs text-[#c9d1d9]">
+              <span className="truncate">{f.name}</span>
+              <span className="shrink-0">
+                <span className="text-[#3fb950]">+{added}</span> <span className="text-[#f85149]">−{removed}</span>
+              </span>
+            </summary>
+            <pre className="max-h-[560px] overflow-auto py-1 text-xs leading-5">
+              {f.lines.map((l, i) => {
+                const tone = l.startsWith("+")
+                  ? "bg-[#2ea04326] text-[#aff5b4]"
+                  : l.startsWith("-")
+                    ? "bg-[#f8514926] text-[#ffdcd7]"
+                    : l.startsWith("@@")
+                      ? "bg-[#1f6feb1a] text-[#79c0ff]"
+                      : "text-[#c9d1d9]";
+                return (
+                  <div key={i} className={`whitespace-pre px-3 font-mono ${tone}`}>
+                    {l || " "}
+                  </div>
+                );
+              })}
+            </pre>
+          </details>
+        );
+      })}
     </div>
   );
 }

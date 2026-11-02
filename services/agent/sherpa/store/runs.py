@@ -43,6 +43,12 @@ class RunStore:
 
     async def update_run(self, run_id: str, **fields: Any) -> dict[str, Any]:
         fields["updated_at"] = time.time()
+        # Several agent instances share runs, so load the full run before merging;
+        # subscribers must always receive a complete run, never a fragment.
+        if "created_at" not in self._runs.get(run_id, {}) and self._db:
+            snap = await self._db.collection("runs").document(run_id).get()
+            if snap.exists:
+                self._runs[run_id] = {**snap.to_dict(), **self._runs.get(run_id, {})}
         run = self._runs.setdefault(run_id, {"id": run_id})
         run.update(fields)
         if self._db:
@@ -70,11 +76,13 @@ class RunStore:
     # --- events -----------------------------------------------------------
     async def add_event(self, run_id: str, kind: str, **data: Any) -> dict[str, Any]:
         events = self._events[run_id]
-        event = {"run_id": run_id, "seq": len(events), "ts": time.time(), "kind": kind, **data}
+        # Microsecond timestamps keep sequence numbers unique and ordered across instances.
+        seq = max(time.time_ns() // 1000, (events[-1]["seq"] + 1) if events else 0)
+        event = {"run_id": run_id, "seq": seq, "ts": time.time(), "kind": kind, **data}
         events.append(event)
         if self._db:
             stored = {k: v for k, v in event.items() if k != "screenshot_b64"}
-            doc_id = f"{run_id}-{event['seq']:05d}"
+            doc_id = f"{run_id}-{seq}"
             try:
                 await self._db.collection("events").document(doc_id).set(stored)
             except Exception:
@@ -83,12 +91,15 @@ class RunStore:
         return event
 
     async def list_events(self, run_id: str) -> list[dict[str, Any]]:
-        if self._events.get(run_id):
-            return self._events[run_id]
+        # Firestore holds every instance's events; memory only holds this instance's share.
         if self._db:
-            query = self._db.collection("events").where("run_id", "==", run_id).order_by("seq")
-            return [d.to_dict() async for d in query.stream()]
-        return []
+            try:
+                query = self._db.collection("events").where("run_id", "==", run_id)
+                stored = [d.to_dict() async for d in query.stream()]
+                return sorted(stored, key=lambda e: (e.get("ts", 0), e.get("seq", 0)))
+            except Exception:
+                log.warning("event history read failed", exc_info=True)
+        return list(self._events.get(run_id, []))
 
     # --- streaming --------------------------------------------------------
     def subscribe(self, run_id: str) -> asyncio.Queue:

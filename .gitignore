@@ -13,3 +13,5 @@ coverage/
 .pytest_cache/
 .ruff_cache/
 *.tsbuildinfo
+test-results/
+playwright-report/

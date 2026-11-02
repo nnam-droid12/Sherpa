@@ -65,6 +65,13 @@ class RunStore:
                 return snap.to_dict()
         return None
 
+    async def fresh_run(self, run_id: str) -> dict[str, Any] | None:
+        """Read the shared copy (Firestore), bypassing this instance's cache."""
+        if self._db:
+            snap = await self._db.collection("runs").document(run_id).get()
+            return snap.to_dict() if snap.exists else None
+        return self._runs.get(run_id)
+
     async def list_runs(self, limit: int = 30) -> list[dict[str, Any]]:
         if self._db:
             from google.cloud import firestore

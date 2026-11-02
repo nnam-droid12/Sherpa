@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 
 _tasks: set[asyncio.Task] = set()
 MAX_DIFF = 150_000
+STOP_POLL_SECONDS = 8
 
 
 def add_usage(usage: dict[str, float] | None, patch: dict[str, Any], seconds: float) -> dict[str, float]:
@@ -49,18 +50,39 @@ def add_usage(usage: dict[str, float] | None, patch: dict[str, Any], seconds: fl
 def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[dict[str, Any]]]) -> None:
     """Run a stage in the background; failures are recorded on the run instead of being lost."""
 
+    async def watch_for_stop(work: asyncio.Task) -> None:
+        # A stop can be requested on any agent instance, so poll the shared run document.
+        while not work.done():
+            await asyncio.sleep(STOP_POLL_SECONDS)
+            fresh = await store.fresh_run(run_id)
+            if fresh and fresh.get("stop_requested"):
+                work.cancel()
+                return
+
     async def wrapper() -> None:
-        await store.update_run(run_id, status=f"{stage}:running", stage=stage, error=None)
+        await store.update_run(
+            run_id, status=f"{stage}:running", stage=stage, error=None, stop_requested=False
+        )
         started = time.monotonic()
+        work = asyncio.create_task(job())
+        watcher = asyncio.create_task(watch_for_stop(work))
         try:
-            patch = await job()
+            patch = await work
             run = await store.get_run(run_id) or {}
             patch["usage"] = add_usage(run.get("usage"), patch, time.monotonic() - started)
             await store.update_run(run_id, status=f"{stage}:done", **patch)
+        except asyncio.CancelledError:
+            # Cloud browsers and clones are released by each stage's finally blocks.
+            await store.add_event(run_id, "warning", phase=stage, message="Stopped by the user.")
+            await store.update_run(
+                run_id, status=f"{stage}:failed", error="Stopped by the user.", stop_requested=False
+            )
         except Exception as exc:
             log.exception("stage %s failed", stage, extra={"run_id": run_id})
             await store.add_event(run_id, "error", phase=stage, message=str(exc)[:500])
             await store.update_run(run_id, status=f"{stage}:failed", error=str(exc)[:500])
+        finally:
+            watcher.cancel()
 
     task = asyncio.create_task(wrapper())
     _tasks.add(task)
@@ -250,6 +272,7 @@ class Stage:
 
 
 STAGES: dict[str, Stage] = {
+    "audit": Stage("audit", (), audit_job),
     "fix": Stage("fix", ("audit", "repo"), fix_job),
     "verify": Stage("verify", ("fix",), verify_job),
     "agent-ready": Stage("agent_ready", ("fix",), agent_ready_job),

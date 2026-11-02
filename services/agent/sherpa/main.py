@@ -156,6 +156,17 @@ async def get_artifact(art_id: str) -> Response:
     return Response(data, media_type=content_type, headers={"Cache-Control": "private, max-age=86400"})
 
 
+@app.post("/api/runs/{run_id}/stop", dependencies=[Depends(require_api_key)])
+async def stop_run(run_id: str) -> dict:
+    store = get_store()
+    run = await store.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "run not found")
+    if not str(run.get("status", "")).endswith(":running"):
+        raise HTTPException(409, "nothing is running on this run")
+    return await store.update_run(run_id, stop_requested=True)
+
+
 @app.post("/api/runs/{run_id}/{stage}", dependencies=[Depends(require_api_key), Depends(enforce)])
 async def start_stage(run_id: str, stage: str) -> dict:
     store = get_store()

@@ -71,3 +71,34 @@ async def test_screenshot_falls_back_to_store_when_paypal_popup_closed():
     b = SimpleNamespace(main=main, page=FakePage(True, b"popup"))
     assert await shopper._active_screenshot(b) == b"store"
     assert b.page is main
+
+
+async def test_stop_request_cancels_a_running_stage(monkeypatch):
+    import asyncio
+
+    from sherpa import pipeline
+    from sherpa.store.runs import RunStore
+
+    monkeypatch.setattr(pipeline, "STOP_POLL_SECONDS", 0.05)
+    store = RunStore(use_firestore=False)
+    run = await store.create_run({"store_url": "https://store.example"})
+    cleaned = asyncio.Event()
+
+    async def slow_job():
+        try:
+            await asyncio.sleep(30)
+        finally:
+            cleaned.set()  # stages release browsers and clones in finally blocks
+        return {}
+
+    pipeline.spawn(store, run["id"], "fix", slow_job)
+    await asyncio.sleep(0.1)
+    assert (await store.get_run(run["id"]))["status"] == "fix:running"
+    await store.update_run(run["id"], stop_requested=True)
+    for _ in range(50):
+        await asyncio.sleep(0.05)
+        if (await store.get_run(run["id"]))["status"] != "fix:running":
+            break
+    final = await store.get_run(run["id"])
+    assert final["status"] == "fix:failed" and final["error"] == "Stopped by the user."
+    assert cleaned.is_set()

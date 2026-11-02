@@ -7,6 +7,7 @@ import { useRun } from "@/lib/use-run";
 import { CategoryBars } from "./category-bars";
 import { DiffView } from "./diff-view";
 import { FindingCard } from "./finding-card";
+import { FixWorkspace } from "./fix-workspace";
 import { LiveView } from "./live-view";
 import { ScoreDial } from "./score-dial";
 
@@ -50,7 +51,7 @@ function ActionButton({ onClick, busy, children }: { onClick: () => void; busy: 
 }
 
 function AgentLog({ events, phase }: { events: RunEvent[]; phase: string }) {
-  const items = events.filter((e) => e.phase === phase && e.kind !== "step");
+  const items = events.filter((e) => e.phase === phase && e.kind !== "step" && e.kind !== "file");
   if (!items.length) return null;
   return (
     <ol className="max-h-80 overflow-y-auto rounded-xl border border-border bg-bg p-3 font-mono text-xs leading-6" aria-live="polite">
@@ -185,7 +186,13 @@ export function RunView({ runId, initial }: { runId: string; initial: Run | null
             ) : undefined
           }
         >
-          <AgentLog events={events} phase="fix" />
+          <FixWorkspace events={events} phase="fix" />
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted">Agent log</summary>
+            <div className="mt-2">
+              <AgentLog events={events} phase="fix" />
+            </div>
+          </details>
           {run?.fix && (
             <div className="grid gap-4">
               <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -260,7 +267,13 @@ export function RunView({ runId, initial }: { runId: string; initial: Run | null
             In production, PayPal&apos;s Commerce Platform calls these merchant endpoints after Store Sync onboarding. In
             this sandbox build, Sherpa&apos;s buyer agent plays that caller role.
           </p>
-          <AgentLog events={events} phase="agent_ready" />
+          <FixWorkspace events={events} phase="agent_ready" />
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted">Agent log</summary>
+            <div className="mt-2">
+              <AgentLog events={events} phase="agent_ready" />
+            </div>
+          </details>
           {stageState(run, "agent_ready") === "running" && <LiveView events={events} running phase="agent_ready" />}
           {run?.agent_ready && (
             <div className="grid gap-6 lg:grid-cols-2">

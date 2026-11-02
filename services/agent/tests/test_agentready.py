@@ -75,3 +75,27 @@ def test_persona_answers_delivery_and_address():
 def test_reference_ships_with_package():
     ref = cart_api_reference()
     assert "/merchant-cart/{id}/checkout" in ref and "validation_issues" in ref
+
+
+def test_describe_call_summarises_cart_and_order_calls():
+    from sherpa.buyer.agent import describe_call
+
+    ep, text, tone = describe_call(
+        "create_cart",
+        {},
+        {
+            "http_status": 201,
+            "status": "CREATED",
+            "validation_status": "INVALID",
+            "totals": {"total": {"value": "78.00"}},
+            "validation_issues": [{"code": "DATA_ERROR", "message": "A delivery date is required"}],
+        },
+    )
+    assert ep == "POST /merchant-cart" and tone == "warn"
+    assert "INVALID" in text and "$78.00" in text and "delivery date" in text
+    _, text, tone = describe_call(
+        "check_paypal_order", {}, {"id": "5O1", "status": "COMPLETED", "amount": "USD 78.00"}
+    )
+    assert tone == "good" and "COMPLETED" in text
+    _, _, tone = describe_call("checkout_cart", {}, {"error": "boom"})
+    assert tone == "bad"

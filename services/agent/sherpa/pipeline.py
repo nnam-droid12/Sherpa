@@ -210,10 +210,18 @@ async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any
             feed = (await c.get(f"{preview_url}/catalog.json")).json().get("items", [])
     except Exception as exc:
         await emit("warning", message=f"Catalog feed unreadable: {exc}")
+    await emit("catalog", url=f"{preview_url}/catalog.json", count=len(feed), items=feed[:6])
     item_id = feed[0]["id"] if feed else ""
     date = next_weekday(5, min_days=7).isoformat()
+
+    async def on_contract(result: dict[str, Any]) -> None:
+        await emit("contract", **result)
+
     endpoints = await run_contract_tests(
-        preview_url, item_id, [{"type": "DELIVERY_DATE_PREFERENCE", "value": date}]
+        preview_url,
+        item_id,
+        [{"type": "DELIVERY_DATE_PREFERENCE", "value": date}],
+        on_result=on_contract,
     )
     await emit("log", message=f"Contract tests: {sum(e['ok'] for e in endpoints)}/{len(endpoints)} passed")
 

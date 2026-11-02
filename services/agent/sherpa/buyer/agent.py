@@ -136,6 +136,51 @@ DECLARATIONS = [
 ]
 
 
+ENDPOINTS = {
+    "search_catalog": "GET /catalog.json",
+    "create_cart": "POST /merchant-cart",
+    "get_cart": "GET /merchant-cart/{id}",
+    "update_cart": "PUT /merchant-cart/{id}",
+    "checkout_cart": "POST /merchant-cart/{id}/checkout",
+    "approve_payment": "PayPal approval (cloud browser)",
+    "check_paypal_order": "PayPal Agent Toolkit · get_order_details",
+}
+
+
+def describe_call(name: str, args: dict[str, Any], out: Any) -> tuple[str, str, str]:
+    """A short, human-readable line for each tool call: (endpoint, summary, tone good|warn|bad)."""
+    endpoint = ENDPOINTS.get(name, name)
+    if not isinstance(out, dict | list):
+        return endpoint, str(out)[:300], "good"
+    if isinstance(out, list):
+        names = ", ".join(
+            f"{i.get('title', i.get('id'))} (${(i.get('price') or {}).get('value', '?')})" for i in out[:3]
+        )
+        return endpoint, f"{len(out)} matching products: {names}", "good"
+    if out.get("error"):
+        return endpoint, str(out["error"])[:300], "bad"
+    if name in {"create_cart", "get_cart", "update_cart", "checkout_cart"}:
+        total = ((out.get("totals") or {}).get("total") or {}).get("value")
+        issues = out.get("validation_issues") or []
+        parts = [f"HTTP {out.get('http_status', '?')}", out.get("status"), out.get("validation_status")]
+        if total:
+            parts.append(f"total ${total}")
+        if issues:
+            parts.append("needs: " + "; ".join(str(i.get("message") or i.get("code")) for i in issues[:2]))
+        tone = (
+            "good" if out.get("validation_status") == "VALID" or out.get("status") == "COMPLETED" else "warn"
+        )
+        if (out.get("http_status") or 200) >= 500:
+            tone = "bad"
+        return endpoint, " · ".join(str(p) for p in parts if p), tone
+    if name in {"approve_payment", "check_paypal_order"}:
+        status = out.get("status")
+        oid = out.get("order_id") or out.get("id")
+        tone = "good" if status in {"APPROVED", "COMPLETED"} else "warn"
+        return endpoint, f"order {oid}: {status}" + (f" · {out['amount']}" if out.get("amount") else ""), tone
+    return endpoint, json.dumps(out)[:300], "good"
+
+
 def toolkit_order_status(order_id: str) -> dict[str, Any]:
     """Look up an order with the PayPal Agent Toolkit (Orders actions, sandbox)."""
     from paypal_agent_toolkit.shared.api import PayPalAPI
@@ -159,8 +204,8 @@ async def run_buyer(store_url: str, request: str, emit: Emit, *, max_turns: int 
     final_order: dict[str, Any] | None = None
     await emit("log", message=f"Buyer agent: {request}")
 
-    async def say(role: str, text: str, tool: str | None = None) -> None:
-        entry = {"role": role, "text": text[:800]}
+    async def say(role: str, text: str, tool: str | None = None, **extra: Any) -> None:
+        entry: dict[str, Any] = {"role": role, "text": text[:800], **extra}
         if tool:
             entry["tool"] = tool
         transcript.append(entry)
@@ -280,8 +325,8 @@ async def run_buyer(store_url: str, request: str, emit: Emit, *, max_turns: int 
                 except Exception as exc:  # surfaced to the model so it can recover
                     out = {"error": f"{type(exc).__name__}: {exc}"}
                 if call.name != "ask_shopper":
-                    summary = json.dumps(out)[:400] if not isinstance(out, str) else out
-                    await say("tool", summary, tool=call.name)
+                    endpoint, summary, tone = describe_call(call.name, args, out)
+                    await say("tool", summary, tool=call.name, endpoint=endpoint, tone=tone)
                 replies.append(
                     types.Part(
                         function_response=types.FunctionResponse(name=call.name, response={"result": out})
@@ -289,4 +334,6 @@ async def run_buyer(store_url: str, request: str, emit: Emit, *, max_turns: int 
                 )
             history.append(types.Content(role="user", parts=replies))
 
+    if final_order:
+        await emit("order", **final_order)
     return {"transcript": transcript, "order": final_order}

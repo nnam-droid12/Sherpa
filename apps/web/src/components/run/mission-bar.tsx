@@ -26,7 +26,11 @@ type Action = { label: string; stage?: string; hint: string };
 function nextAction(run: Run | null, states: Record<StageKey, StageState>): Action | null {
   if (!run || states.audit === "running") return null;
   if (Object.values(states).includes("running")) return null;
-  if (!run.audit) return null;
+  if (!run.audit) {
+    return states.audit === "failed"
+      ? { label: "Retry audit", stage: "audit", hint: "Run the AI shoppers and the checks again." }
+      : null;
+  }
   if (!run.repo) return { label: "Add a repo to fix", hint: "Start a new run with a GitHub repo to unlock Fix, Verify and Agent-ready." };
   if (!run.fix) {
     return states.fix === "failed"
@@ -105,10 +109,21 @@ export function MissionBar({
             </a>
           )}
           {running && (
-            <span className="flex items-center gap-2 rounded-lg bg-accent/10 px-3 py-2 text-sm text-accent">
-              <span className="size-2 animate-pulse rounded-full bg-accent" />
-              {running.label} in progress…
-            </span>
+            <>
+              <span className="flex items-center gap-2 rounded-lg bg-accent/10 px-3 py-2 text-sm text-accent">
+                <span className="size-2 animate-pulse rounded-full bg-accent" />
+                {run?.stop_requested ? "Stopping…" : `${running.label} in progress…`}
+              </span>
+              {run?.status !== "queued" && !run?.stop_requested && (
+                <button
+                  onClick={() => onAction("stop")}
+                  disabled={busy}
+                  className="rounded-lg border border-bad/40 px-3 py-2 text-sm font-medium text-bad transition hover:bg-bad/10 disabled:opacity-60"
+                >
+                  Stop
+                </button>
+              )}
+            </>
           )}
           {complete && (
             <span className="rounded-lg bg-good/15 px-3 py-2 text-sm font-medium text-good">All four stages complete</span>

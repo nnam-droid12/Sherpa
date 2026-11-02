@@ -97,7 +97,7 @@ export function RunView({ runId, initial }: { runId: string; initial: Run | null
     try {
       await action(stage);
       const anchor = stage === "agent-ready" ? "agent_ready" : stage;
-      setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth" }), 150);
+      if (stage !== "stop") setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth" }), 150);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

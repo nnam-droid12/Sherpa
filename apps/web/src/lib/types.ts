@@ -76,6 +76,7 @@ export type Run = {
   verify?: VerifyResult;
   agent_ready?: AgentReady;
   usage?: { model_calls: number; browser_minutes: number; steps: number; seconds: number };
+  stop_requested?: boolean;
 };
 
 export type RunEvent = {

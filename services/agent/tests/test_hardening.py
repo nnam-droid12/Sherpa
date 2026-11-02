@@ -25,3 +25,23 @@ def test_usage_accumulates_across_stages():
     assert first == {"steps": 15, "browser_minutes": 3.0, "model_calls": 17, "seconds": 200.0}
     second = add_usage(first, {"fix": {"model_calls": 30}}, 100)
     assert second["model_calls"] == 47 and second["steps"] == 15 and second["seconds"] == 300.0
+
+
+async def test_preview_api_merges_extra_headers(monkeypatch):
+    import httpx
+
+    from sherpa.verify import preview
+
+    seen = {}
+
+    async def fake_request(self, method, url, headers=None, **kw):
+        seen.update(headers or {})
+        return httpx.Response(200, json={"ok": True}, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(preview, "_token", lambda: "tok")
+    monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+    out = await preview._api(
+        "POST", "https://storage.example/upload", content=b"x", headers={"Content-Type": "application/gzip"}
+    )
+    assert out == {"ok": True}
+    assert seen == {"Authorization": "Bearer tok", "Content-Type": "application/gzip"}

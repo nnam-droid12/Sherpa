@@ -42,10 +42,12 @@ def _tarball(root: Path) -> bytes:
     return buf.getvalue()
 
 
-async def _api(method: str, url: str, **kw: Any) -> dict[str, Any]:
+async def _api(method: str, url: str, *, headers: dict[str, str] | None = None, **kw: Any) -> dict[str, Any]:
     token = await asyncio.to_thread(_token)
-    async with httpx.AsyncClient(timeout=60) as c:
-        r = await c.request(method, url, headers={"Authorization": f"Bearer {token}"}, **kw)
+    async with httpx.AsyncClient(timeout=120) as c:
+        r = await c.request(
+            method, url, headers={"Authorization": f"Bearer {token}", **(headers or {})}, **kw
+        )
     if r.status_code >= 400:
         raise RuntimeError(f"{method} {url.split('?')[0]} failed: {r.status_code} {r.text[:400]}")
     return r.json() if r.content else {}

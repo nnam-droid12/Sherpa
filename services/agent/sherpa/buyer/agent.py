@@ -38,6 +38,8 @@ APPROVE_GOAL = (
     "payment (for example 'Pay', 'Complete Purchase' or 'Continue'). Stop as soon as you are sent back to the store "
     "or see a confirmation, then give a one-line summary starting with SUMMARY:."
 )
+MAX_ORDER_CHECKS = 3
+MAX_APPROVALS = 2
 APPROVE_RULES = "Rules: Stay on PayPal and the store. Do not change the shipping address or funding source."
 
 
@@ -201,6 +203,8 @@ async def run_buyer(store_url: str, request: str, emit: Emit, *, max_turns: int 
     persona = Persona(request)
     transcript: list[dict[str, str]] = [{"role": "user", "text": request}]
     carts: dict[str, dict[str, Any]] = {}
+    checks: dict[str, int] = {}
+    attempts: dict[str, int] = {}
     final_order: dict[str, Any] | None = None
     await emit("log", message=f"Buyer agent: {request}")
 
@@ -252,8 +256,22 @@ async def run_buyer(store_url: str, request: str, emit: Emit, *, max_turns: int 
             if name == "update_cart":
                 return await cart_call("PUT", f"/merchant-cart/{args['cart_id']}", body)
             if name == "check_paypal_order":
-                return await asyncio.to_thread(toolkit_order_status, args["order_id"])
+                checks[args["order_id"]] = checks.get(args["order_id"], 0) + 1
+                status = await asyncio.to_thread(toolkit_order_status, args["order_id"])
+                if checks[args["order_id"]] > MAX_ORDER_CHECKS and status.get("status") not in {
+                    "APPROVED",
+                    "COMPLETED",
+                }:
+                    status["error"] = (
+                        "Still not approved after several checks. Stop checking and tell the shopper."
+                    )
+                return status
             if name == "approve_payment":
+                attempts["approve"] = attempts.get("approve", 0) + 1
+                if attempts["approve"] > MAX_APPROVALS:
+                    return {
+                        "error": "Approval already tried twice. Stop and tell the shopper the payment wasn't approved."
+                    }
                 cart = carts.get(args["cart_id"]) or await cart_call(
                     "GET", f"/merchant-cart/{args['cart_id']}"
                 )

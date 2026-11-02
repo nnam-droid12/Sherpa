@@ -181,6 +181,27 @@ async def _sandbox_login(page: Page, email: str, password: str) -> bool:
     return did
 
 
+async def _paypal_prelogin(page: Page, email: str, password: str) -> bool:
+    """Sign the sandbox buyer in on PayPal's own sign-in page before shopping.
+
+    PayPal's checkout entry varies (guest-first /pay pages, iframes, popups). A buyer who is already
+    signed in lands straight on the review page with a single Pay button, which is far more reliable.
+    The store under test is untouched, so audit results are unaffected.
+    """
+    if not email:
+        return False
+    try:
+        await page.goto("https://www.sandbox.paypal.com/signin", wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(2500)
+        for _ in range(3):
+            await _sandbox_login(page, email, password)
+            if "signin" not in page.url:
+                return True
+    except Exception:
+        log.warning("PayPal pre-login failed; the shopper will sign in during checkout", exc_info=True)
+    return False
+
+
 async def _screenshot(page: Page) -> bytes:
     mask = [page.locator("#email, #password, input[type='password'], input[name='login_email']")]
     return await page.screenshot(type="png", mask=mask, animations="disabled")
@@ -259,7 +280,14 @@ async def _execute(
         if args.get("press_enter", name == "type_text_at"):
             await page.keyboard.press("Enter")
     elif name in ("key_combination", "press_key", "hotkey"):
-        await page.keyboard.press(norm_keys(args.get("keys") or args.get("key", "")))
+        keys = norm_keys(args.get("keys") or args.get("key", ""))
+        if not keys.strip("+"):
+            return "No key was given; name the key to press, for example Enter or Tab."
+        await page.keyboard.press(" " if keys == "space" else keys)
+    elif name in ("mouse_down", "mouse_up"):
+        if "x" in args and "y" in args:
+            await page.mouse.move(_px(args["x"], w), _px(args["y"], h))
+        await (page.mouse.down() if name == "mouse_down" else page.mouse.up())
     elif name in ("scroll_document", "scroll_at", "scroll"):
         direction = args.get("direction", "down")
         if "x" in args and "y" in args:
@@ -316,6 +344,7 @@ async def run_shopper(
     goal: str = GOAL,
     rules: str = RULES,
     start_url: str | None = None,
+    prelogin: bool = True,
 ) -> ShopperResult:
     settings = get_settings()
     started = time.monotonic()
@@ -337,6 +366,10 @@ async def run_shopper(
                 "session", device=device, live_view_url=session.live_view_url, replay_url=session.replay_url
             )
             b = _Browser(session, store_host)
+            if prelogin and await _paypal_prelogin(
+                b.page, settings.paypal_buyer_email, settings.paypal_buyer_password
+            ):
+                await emit("sandbox_login", device=device, step=0, prelogin=True)
             await b.page.goto(start_url or store_url, wait_until="domcontentloaded")
 
             shot = await _active_screenshot(b)

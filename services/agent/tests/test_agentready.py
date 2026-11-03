@@ -99,3 +99,11 @@ def test_describe_call_summarises_cart_and_order_calls():
     assert tone == "good" and "COMPLETED" in text
     _, _, tone = describe_call("checkout_cart", {}, {"error": "boom"})
     assert tone == "bad"
+
+
+def test_persona_answers_address_questions_with_the_address():
+    p = Persona("cake")
+    a = p.answer("Could you share your delivery address and your name/email for the delivery?")
+    assert "94105" in a and "Saturday" not in a and "Alex Rivera" in a
+    both = p.answer("What delivery date and shipping address should we use?")
+    assert "94105" in both and "Saturday" in both

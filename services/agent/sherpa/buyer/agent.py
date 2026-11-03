@@ -59,11 +59,16 @@ class Persona:
 
     def answer(self, question: str) -> str:
         q = question.lower()
-        if any(w in q for w in ("date", "day", "when", "deliver")):
-            sat = next_weekday(5)
-            return f"Please deliver on Saturday {sat.isoformat()}."
-        if any(w in q for w in ("address", "ship", "where")):
-            return f"Ship to {json.dumps(SAMPLE_ADDRESS)}."
+        # Address first: "delivery address" also mentions delivery, but it isn't asking for a date.
+        parts = []
+        if any(w in q for w in ("address", "ship", "where", "street", "zip")):
+            parts.append(f"Ship to {json.dumps(SAMPLE_ADDRESS)}.")
+        if any(w in q for w in ("date", "day", "when")) or ("deliver" in q and not parts):
+            parts.append(f"Please deliver on Saturday {next_weekday(5).isoformat()}.")
+        if ("name" in q or "email" in q) and parts:
+            parts.append(f"I'm Alex Rivera, {self.email}.")
+        if parts:
+            return " ".join(parts)
         if "email" in q:
             return f"My email is {self.email}."
         if "name" in q:

@@ -41,10 +41,9 @@ otherwise fetch the PayPal order, and if it is APPROVED capture it, verify the c
 set status COMPLETED and add payment_confirmation {merchant_order_number, order_review_page}; if it is not yet \
 approved return 422 with name "UNPROCESSABLE_ENTITY" and a message telling the caller the buyer must approve the \
 PayPal payment first. Errors use {name, message, debug_id}.
-4. A contract test suite for these endpoints that runs with `npm test` without network access (mock the PayPal \
-calls), covering create, get, 404, update (full replace), validation issues and checkout before approval.
-Keep all existing checkout fixes working. Do not add dependencies unless unavoidable; Node's built-in test runner \
-(`node --test`) is fine. Run run_build (which also runs npm test) before finish.
+Do not write a separate test suite: Sherpa runs a live contract test suite against every endpoint on the deployed \
+preview straight after this step. Keep all existing checkout fixes working, do not add dependencies, keep the \
+change small, and run run_build once before finish.
 
 PayPal Cart API v1 reference:
 """
@@ -67,9 +66,6 @@ def agent_ready_check(ws: Workspace) -> list[str]:
             problems.append(f"`{needle}` is missing from the Cart API implementation.")
     if not re.search(r"checkout", corpus):
         problems.append("No /merchant-cart/{id}/checkout handler found.")
-    pkg = files.get("package.json", "")
-    if '"test"' not in pkg:
-        problems.append("Add an npm test script that runs the Cart API contract tests.")
     problems += self_check(ws)
     return problems
 

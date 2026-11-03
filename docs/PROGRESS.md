@@ -18,9 +18,11 @@ _Last updated: 2026-11-02_
 - **Agent-ready:** Ember & Oak passes 8/8 Cart API contract tests on the preview. The AI buyer agent found the tent, resolved the store's "shipping address required" validation issue, approved the payment in a cloud browser and checked out; order `9G790614RT203802M` is `COMPLETED` for USD 349.00.
 - **Sandbox login:** works on both of PayPal's entry pages (guest-first and direct login).
 
+- **Lumen Bakehouse:** fix → verify (18 → 82) → agent-ready, with 8/8 contract tests. The buyer agent completed the brief's scenario ("birthday cake for 12 people delivered Saturday, under $90") and bought the $78 Vanilla Bean Celebration Cake after resolving the delivery-date and address validation issues; order `10190348DW8567420` is `COMPLETED`.
+
 ## In progress
 
-- The Lumen Bakehouse fix → verify → agent-ready flow on the new faster fixer.
+- Re-run Verify on Lumen. The previous verify predates the PayPal pre-login fix, so neither shopper completed a payment and the score stopped at 82.
 
 ## Next
 

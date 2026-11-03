@@ -44,6 +44,13 @@ def healthz() -> dict:
     return {"ok": True, "service": "sherpa-agent", "version": __version__, "paypal": "sandbox"}
 
 
+@app.get("/internal/hold", dependencies=[Depends(require_api_key)])
+async def hold(seconds: int = 240) -> dict:
+    """Kept open by running stages so Cloud Run doesn't stop this instance mid-job (see pipeline)."""
+    await asyncio.sleep(max(1, min(seconds, 600)))
+    return {"held": seconds}
+
+
 @app.get("/api/config", dependencies=[Depends(require_api_key)])
 def public_config(s: Settings = Depends(get_settings)) -> dict:
     return {

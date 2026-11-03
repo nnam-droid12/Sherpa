@@ -15,6 +15,7 @@ import httpx
 from sherpa.agentready.spec import agent_ready_check, agent_ready_task, run_contract_tests
 from sherpa.audit.runner import run_audit
 from sherpa.buyer.agent import next_weekday, run_buyer
+from sherpa.config import get_settings
 from sherpa.fixer import github
 from sherpa.fixer.agent import run_fixer
 from sherpa.fixer.pr import pr_body, scorecard_comment
@@ -29,6 +30,7 @@ _tasks: set[asyncio.Task] = set()
 MAX_DIFF = 150_000
 STOP_POLL_SECONDS = 8
 HEARTBEAT_SECONDS = 45
+HOLD_SECONDS = 240
 
 
 def add_usage(usage: dict[str, float] | None, patch: dict[str, Any], seconds: float) -> dict[str, float]:
@@ -46,6 +48,25 @@ def add_usage(usage: dict[str, float] | None, patch: dict[str, Any], seconds: fl
     total["browser_minutes"] = round(total["browser_minutes"], 1)
     total["seconds"] = round(total["seconds"], 1)
     return total
+
+
+async def keep_instance_busy(work: asyncio.Task) -> None:
+    """Hold a request open against this instance while a stage runs.
+
+    Cloud Run only keeps an instance alive while it is serving requests, and stages run as background
+    work. A long-lived request to ourselves (one instance max, so it lands here) keeps the instance up
+    while there is work, and lets the service scale to zero, costing nothing, when idle.
+    """
+    s = get_settings()
+    if s.env in {"test", "local"} or not s.public_url.startswith("https://"):
+        return
+    url = f"{s.public_url.rstrip('/')}/internal/hold"
+    async with httpx.AsyncClient(timeout=HOLD_SECONDS + 30) as client:
+        while not work.done():
+            try:
+                await client.get(url, params={"seconds": HOLD_SECONDS}, headers={"X-Sherpa-Key": s.api_key})
+            except Exception:
+                await asyncio.sleep(5)
 
 
 def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[dict[str, Any]]]) -> None:
@@ -77,6 +98,7 @@ def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[
         started = time.monotonic()
         work = asyncio.create_task(job())
         watcher = asyncio.create_task(watch_for_stop(work))
+        holder = asyncio.create_task(keep_instance_busy(work))
         try:
             patch = await work
             run = await store.get_run(run_id) or {}
@@ -94,6 +116,7 @@ def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[
             await store.update_run(run_id, status=f"{stage}:failed", error=str(exc)[:500])
         finally:
             watcher.cancel()
+            holder.cancel()
 
     task = asyncio.create_task(wrapper())
     _tasks.add(task)

@@ -149,6 +149,9 @@ class Workspace:
                 "NEXT_TELEMETRY_DISABLED": "1",
                 "npm_config_audit": "false",
                 "npm_config_fund": "false",
+                # Next.js builds can spike past the container limit; cap the heap so a store build
+                # never takes the agent down with it.
+                "NODE_OPTIONS": "--max-old-space-size=1536",
             }
         )
         return env

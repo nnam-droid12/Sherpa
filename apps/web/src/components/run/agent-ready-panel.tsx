@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { Run, RunEvent } from "@/lib/types";
 import { FixWorkspace } from "../fix-workspace";
 import { LiveView } from "../live-view";
+import { AgentShelf } from "./agent-shelf";
 import type { StageState } from "./mission-bar";
 
 type FeedItem = {
@@ -164,6 +165,7 @@ const PREVIEW = [
   ["Catalog feed", "A machine-readable /catalog.json built from the store's real products."],
   ["PayPal Cart API", "POST, GET and PUT /merchant-cart plus /checkout, wired to PayPal Orders, as a second commit on the PR."],
   ["Contract tests", "Every endpoint is tested live against the redeployed preview."],
+  ["Agent Shelf", "Live Channel3 market data: what a shopper's agent finds elsewhere, and how this store's prices compare."],
   ["AI buyer agent", "An agent is asked to buy something for a shopper, and checks out through PayPal on its own."],
 ];
 
@@ -186,7 +188,7 @@ export function AgentReadyPanel({ run, events, state }: { run: Run | null; event
       </p>
 
       {state === "todo" && !run?.agent_ready ? (
-        <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {PREVIEW.map(([t, d], i) => (
             <li key={t} className="rounded-xl border border-dashed border-border p-4">
               <p className="font-mono text-xs text-accent">0{i + 1}</p>
@@ -203,10 +205,13 @@ export function AgentReadyPanel({ run, events, state }: { run: Run | null; event
           <Step n={2} title="Catalog feed" sub="What AI shopping agents now see when they discover the store.">
             <Catalog event={catalog} />
           </Step>
-          <Step n={3} title="Cart API contract tests" sub="Each PayPal Cart API v1 endpoint is called on the live preview.">
+          <Step n={3} title="Agent Shelf" sub="What a shopper's AI agent finds on the open web for the same products, and how this store's prices compare.">
+            <AgentShelf run={run} events={events} running={running} />
+          </Step>
+          <Step n={4} title="Cart API contract tests" sub="Each PayPal Cart API v1 endpoint is called on the live preview.">
             <ContractTests results={contracts} running={running} />
           </Step>
-          <Step n={4} title="AI buyer agent" sub="Gemini function calling drives the Cart API; the PayPal Agent Toolkit checks the order.">
+          <Step n={5} title="AI buyer agent" sub="Gemini function calling drives the Cart API; the PayPal Agent Toolkit checks the order.">
             <Chat messages={chat} order={order} running={running} hasBrowser={hasBrowser} events={events} />
           </Step>
         </>

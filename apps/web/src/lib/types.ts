@@ -61,6 +61,34 @@ export type AgentReady = {
   order: { id: string; status: string } | null;
 };
 
+export type ShelfProduct = {
+  id: string;
+  title: string;
+  brand?: string | null;
+  category?: string | null;
+  price: number;
+  domain?: string | null;
+  url?: string | null;
+  offers: number;
+  image?: string | null;
+  rating?: number | null;
+  reviews?: number | null;
+};
+
+export type ShelfItem = {
+  id: string;
+  title: string;
+  image?: string | null;
+  price: number | null;
+  query: string;
+  position: "below" | "in_line" | "above" | "no_match";
+  delta: number | null;
+  market: { count: number; min: number | null; median: number | null; max: number | null; retailers: string[] };
+  comparables: ShelfProduct[];
+};
+
+export type Shelf = { available: boolean; source?: string; searches?: number; items: ShelfItem[]; reason?: string };
+
 export type Run = {
   id: string;
   status: string;
@@ -78,6 +106,7 @@ export type Run = {
   usage?: { model_calls: number; browser_minutes: number; steps: number; seconds: number };
   stop_requested?: boolean;
   autopilot?: boolean;
+  shelf?: Shelf | null;
 };
 
 export type RunEvent = {

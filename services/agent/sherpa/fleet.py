@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import re
 import socket
 import time
 from dataclasses import asdict, dataclass, field
@@ -17,11 +18,20 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from sherpa.audit.runner import HTML_PATHS
-from sherpa.audit.static_checks import FEED_PATHS, detect_sdk, has_pay_later, has_venmo, probe_cart_api
+from sherpa.audit.static_checks import (
+    FEED_PATHS,
+    detect_sdk_in_source,
+    has_pay_later,
+    has_venmo,
+    probe_cart_api,
+)
 
 MAX_STORES = 25
 CONCURRENCY = 6
 STORE_TIMEOUT_S = 30
+MAX_SCRIPTS = 12
+MAX_SCRIPT_BYTES = 1_500_000
+SCRIPT_SRC_RE = re.compile(r"""<script[^>]+src=["']([^"']+)["']""", re.I)
 
 # Points per signal, out of 100.
 POINTS = {"paypal": 30, "sdk_v6": 20, "venmo": 10, "pay_later": 10, "catalog_feed": 15, "cart_api": 15}
@@ -93,6 +103,25 @@ def grade(h: StoreHealth) -> None:
         h.issues.append("No Cart API for AI agents")
 
 
+async def _own_scripts(c: httpx.AsyncClient, base: str, html: str) -> list[str]:
+    """Same-origin scripts, where SPAs and Next.js stores load the PayPal SDK after the page renders."""
+    host = urlparse(base).netloc
+    out: list[str] = []
+    for src in dict.fromkeys(SCRIPT_SRC_RE.findall(html)):
+        url = urljoin(base, src)
+        if urlparse(url).netloc != host:
+            continue
+        try:
+            r = await c.get(url)
+        except httpx.HTTPError:
+            continue
+        if r.status_code == 200 and len(r.content) <= MAX_SCRIPT_BYTES:
+            out.append(r.text)
+        if len(out) >= MAX_SCRIPTS:
+            break
+    return out
+
+
 async def check_store(url: str) -> StoreHealth:
     h = StoreHealth(url=url.rstrip("/"))
     base = h.url + "/"
@@ -121,7 +150,8 @@ async def check_store(url: str) -> StoreHealth:
                     if r.status_code == 200 and "html" in r.headers.get("content-type", ""):
                         pages.append(r.text)
                 html = "\n".join(pages)
-                sdk = detect_sdk(html)
+                html += "\n" + "\n".join(await _own_scripts(c, base, html))
+                sdk = detect_sdk_in_source({"pages": html})
                 h.sdk = sdk.version
                 h.paypal = sdk.version != "none"
                 h.venmo = h.paypal and has_venmo(sdk, html)

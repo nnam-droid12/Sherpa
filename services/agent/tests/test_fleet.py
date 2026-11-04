@@ -61,3 +61,15 @@ async def test_unreachable_store_is_reported(public):
         mock.get("https://down.example/").mock(side_effect=httpx.ConnectError("boom"))
         h = await fleet.check_store("https://down.example")
     assert not h.reachable and h.error and h.issues[0] == h.error
+
+
+@pytest.mark.asyncio
+async def test_sdk_loaded_from_own_script_is_found(public):
+    page = '<script src="/_next/app.js"></script><script src="https://cdn.other/x.js"></script>'
+    with respx.mock(assert_all_called=False) as mock:
+        _store(mock, "https://spa.example", page)
+        mock.get("https://spa.example/_next/app.js").respond(
+            200, text='s.src="https://www.paypal.com/sdk/js?client-id="+id+"&currency=USD"'
+        )
+        h = await fleet.check_store("https://spa.example")
+    assert h.paypal and h.sdk == "v5"

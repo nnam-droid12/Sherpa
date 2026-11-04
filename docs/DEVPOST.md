@@ -23,6 +23,7 @@ On top of the four stages:
 
 - **⚡ Autopilot** runs all four stages back to back from one click.
 - **Revenue at risk** turns findings into an estimated monthly PayPal revenue at risk, from the merchant's own traffic and order value, with every assumption visible and editable, and shows the estimated revenue recovered after Verify.
+- **Agent Shelf** uses Channel3 to show what a shopper's AI agent finds elsewhere for the same products, with live retailer prices, and where the store's price sits against the market.
 - **Fleet scan** ranks up to 25 stores by checkout health in seconds in an AG Grid table, for platforms and agencies that look after many merchants, with a deep audit one click away.
 
 ## How we built it
@@ -38,6 +39,7 @@ On top of the four stages:
 - **PayPal:** JS SDK v6, Orders v2, Webhooks with `verify-webhook-signature`, Venmo, Pay Later messaging, Cart API v1, the Agent Toolkit, and the official `paypal/AI-Toolkit` best-practice references as grounding.
 - **Google Cloud:** Cloud Run (console, agent, stores, tagged preview revisions), Cloud Build, Artifact Registry, Firestore, Cloud Storage and Secret Manager.
 - **AG Grid** for the fleet scan table.
+- **Channel3** product search for Agent Shelf market data.
 - **Next.js 15** console with server-sent events, and **FastAPI** for the agent.
 
 ## Challenges

@@ -204,13 +204,13 @@ async def start_autopilot(run_id: str) -> dict:
 
 
 @app.post("/api/runs/{run_id}/shelf", dependencies=[Depends(require_api_key), Depends(enforce_fleet)])
-async def agent_shelf(run_id: str) -> dict:
+async def agent_shelf(run_id: str, refresh: bool = False) -> dict:
     """Build the Agent Shelf for a run that finished agent-ready before the shelf existed."""
     store = get_store()
     run = await store.get_run(run_id)
     if not run:
         raise HTTPException(404, "run not found")
-    if run.get("shelf"):
+    if run.get("shelf") and not refresh:
         return run
     ready = run.get("agent_ready")
     if not ready:

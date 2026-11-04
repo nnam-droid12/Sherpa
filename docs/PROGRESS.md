@@ -20,6 +20,7 @@ _Last updated: 2026-11-02_
 
 - **Lumen Bakehouse:** fix → verify (18 → 82) → agent-ready, with 8/8 contract tests. The buyer agent completed the brief's scenario ("birthday cake for 12 people delivered Saturday, under $90") and bought the $78 Vanilla Bean Celebration Cake after resolving the delivery-date and address validation issues; order `10190348DW8567420` is `COMPLETED`.
 
+- **Agent Shelf** (2026-11-04): live on the Ember & Oak and Lumen runs. Ember: 4 products compared against 9–10 real in-stock offers each; Lumen: no direct competitors, as expected.
 - **Autopilot, Revenue at risk and Fleet scan** (2026-11-04): backend tests 38 passing, Playwright smoke tests 14 passing, including a fleet grid test.
 
 ## In progress

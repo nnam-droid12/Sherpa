@@ -33,6 +33,7 @@ Agentic commerce has the same bottleneck. Before an AI agent can buy from a stor
 
 - **⚡ Autopilot.** One click runs Audit → Fix → Verify → Agent-ready back to back. It can also be switched on part-way through a run ("Autopilot the rest"), and it stops cleanly on Stop or on a failed stage.
 - **Revenue at risk.** The scorecard turns findings into an estimated monthly PayPal revenue at risk. The merchant enters sessions, conversion rate, average order, PayPal share and mobile share; every per-finding loss assumption is shown and editable, overlapping issues are combined without double counting, and after Verify it shows the estimated revenue recovered. It is labelled as an estimate, not measured data.
+- **Agent Shelf.** After Agent-ready, Sherpa shows what a shopper's AI agent finds on the open web for the store's own products. Gemini writes the search a shopper's agent would send, [Channel3](https://trychannel3.com) returns live products and in-stock retailer offers, Gemini keeps only real alternatives, and the console plots the store's price against the market (min, median, max). When nothing comparable exists, as with Lumen's cakes, it says so, rather than padding the shelf with lookalikes.
 - **Fleet scan** (`/fleet`). Platforms and agencies paste up to 25 store URLs and get them ranked by checkout health, worst first, in an AG Grid table: PayPal SDK version, Venmo, Pay Later, catalog feed and Cart API. It uses no browsers or model calls, finishes in seconds, refuses private and metadata addresses, and each row opens a deep audit.
 
 ### Results on the demo stores
@@ -96,7 +97,7 @@ All model calls run on **Gemini Enterprise Agent Platform (formerly Vertex AI)**
 
 ## Other tools
 
-KERNEL cloud browsers (live view and replays) · AG Grid (fleet scan) · Google Cloud Run · Cloud Build · Artifact Registry · Firestore · Cloud Storage · Secret Manager · GitHub REST API.
+KERNEL cloud browsers (live view and replays) · AG Grid (fleet scan) · Channel3 (Agent Shelf market data) · Google Cloud Run · Cloud Build · Artifact Registry · Firestore · Cloud Storage · Secret Manager · GitHub REST API.
 
 ## Try it in 2 minutes
 

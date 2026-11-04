@@ -61,6 +61,7 @@ async def test_shelf_compares_only_real_alternatives(configured):
                     product("a", "Trango 2", 1050),
                     product("b", "Mountain 25", 760),
                     product("c", "Advance Pro 2", 800),
+                    product("c2", "Advance  Pro 2", 820),
                     product("d", "Sold out tent", 10, stock="OutOfStock"),
                 ]
             },

@@ -54,7 +54,7 @@ def _config(schema: type[BaseModel]) -> types.GenerateContentConfig:
     return types.GenerateContentConfig(
         response_mime_type="application/json",
         response_schema=schema,
-        temperature=0.1,
+        temperature=0,
         thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
     )
 
@@ -142,6 +142,17 @@ def _summary(p: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _dedupe(products: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The same product listed twice would show twice and skew the median; keep its cheapest listing."""
+    best: dict[tuple[str, str], dict[str, Any]] = {}
+    for p in products:
+        key = ((p["brand"] or "").casefold(), " ".join(p["title"].casefold().split()))
+        if key not in best or p["price"] < best[key]["price"]:
+            best[key] = p
+    kept = {id(p) for p in best.values()}
+    return [p for p in products if id(p) in kept]
+
+
 async def pick_comparables(
     items: list[dict[str, Any]], candidates: dict[str, list[dict[str, Any]]]
 ) -> dict[str, set[str]]:
@@ -208,7 +219,7 @@ async def build_shelf(items: list[dict[str, Any]]) -> dict[str, Any]:
             log.warning("channel3 search failed for %s: %s", item["id"], res)
             candidates[item["id"]] = []
             continue
-        candidates[item["id"]] = [s for s in (_summary(p) for p in res) if s]
+        candidates[item["id"]] = _dedupe([s for s in (_summary(p) for p in res) if s])
     keep = await pick_comparables(items, candidates)
 
     rows = []

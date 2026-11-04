@@ -9,7 +9,7 @@ export function CategoryBars({
   compare?: Record<string, CategoryScore>;
 }) {
   return (
-    <ul className="grid gap-3">
+    <ul className="grid content-start gap-3">
       {Object.entries(categories).map(([key, c]) => {
         const pct = Math.round((c.score / c.max) * 100);
         const before = compare?.[key];

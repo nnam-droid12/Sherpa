@@ -47,3 +47,12 @@ def enforce(request: Request) -> None:
     if _limiter is None:
         _limiter = RateLimiter(s.runs_per_hour)
     _limiter.check(client_key(request))
+
+
+_fleet_limiter = RateLimiter(30)
+
+
+def enforce_fleet(request: Request) -> None:
+    """Fleet scans are browser-free and cheap, so they get their own, looser limit."""
+    if get_settings().demo_mode:
+        _fleet_limiter.check(client_key(request))

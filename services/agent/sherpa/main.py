@@ -12,9 +12,10 @@ from sse_starlette.sse import EventSourceResponse
 
 from sherpa import __version__
 from sherpa.config import Settings, get_settings
+from sherpa.fleet import MAX_STORES, scan
 from sherpa.logging import configure_logging
 from sherpa.pipeline import STAGES, audit_job, spawn
-from sherpa.ratelimit import enforce
+from sherpa.ratelimit import enforce, enforce_fleet
 from sherpa.store.artifacts import get_artifacts, sign
 from sherpa.store.runs import get_store
 
@@ -99,6 +100,18 @@ class NewRun(BaseModel):
     store_type: str = "auto"
     demo_store: str | None = None
     autopilot: bool = False
+
+
+class FleetScan(BaseModel):
+    urls: list[str]
+
+
+@app.post("/api/fleet/scan", dependencies=[Depends(require_api_key), Depends(enforce_fleet)])
+async def fleet_scan(body: FleetScan) -> dict:
+    """Browser-free checkout health check across up to MAX_STORES stores, worst first."""
+    if not body.urls:
+        raise HTTPException(422, "add at least one store URL")
+    return {"stores": await scan(body.urls), "limit": MAX_STORES}
 
 
 @app.post("/api/runs", dependencies=[Depends(require_api_key), Depends(enforce)])

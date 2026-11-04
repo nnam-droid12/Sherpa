@@ -59,3 +59,22 @@ test("layout has no horizontal scroll", async ({ page }) => {
     expect(overflow, path).toBeLessThanOrEqual(1);
   }
 });
+
+test("fleet scan ranks stores in the grid, worst first", async ({ page }) => {
+  const errors = trackErrors(page);
+  const row = (url: string, score: number, sdk: string) => ({
+    url, reachable: true, status: 200, ms: 120, sdk, paypal: sdk !== "none", venmo: false, pay_later: false,
+    catalog_feed: null, catalog_items: 0, cart_api: false, score, issues: ["No Venmo"], error: null,
+  });
+  await page.route("**/api/agent/fleet/scan", (route) =>
+    route.fulfill({ json: { stores: [row("https://b.example", 30, "v5"), row("https://a.example", 50, "v6")], limit: 25 } }),
+  );
+  await page.goto("/fleet");
+  await page.getByLabel(/Store URLs/).fill("https://a.example\nhttps://b.example");
+  await page.getByRole("button", { name: "Scan 2 stores" }).click();
+  const grid = page.getByRole("treegrid").or(page.getByRole("grid"));
+  await expect(grid.getByText("https://b.example")).toBeVisible();
+  await expect(grid.getByText("v5 (legacy)")).toBeVisible();
+  await expect(page.getByText("Stores scanned")).toBeVisible();
+  expect(errors).toEqual([]);
+});

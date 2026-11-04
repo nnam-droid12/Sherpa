@@ -25,6 +25,9 @@ export function SiteHeader() {
           <Link href="/#how" className="hidden rounded-lg px-3 py-1.5 text-muted transition hover:text-fg sm:block">
             How it works
           </Link>
+          <Link href="/fleet" className="hidden rounded-lg px-3 py-1.5 text-muted transition hover:text-fg sm:block">
+            Fleet scan
+          </Link>
           <Link href="/runs" className="hidden rounded-lg px-3 py-1.5 text-muted transition hover:text-fg sm:block">
             Runs
           </Link>

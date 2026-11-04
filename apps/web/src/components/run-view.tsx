@@ -10,6 +10,7 @@ import { FindingCard } from "./finding-card";
 import { FixWorkspace } from "./fix-workspace";
 import { LiveView } from "./live-view";
 import { AgentReadyPanel } from "./run/agent-ready-panel";
+import { RevenueAtRisk } from "./run/revenue-at-risk";
 import { MissionBar, stageState, type StageState } from "./run/mission-bar";
 import { VerifyPanel } from "./run/verify-panel";
 import { ScoreDial } from "./score-dial";
@@ -165,6 +166,7 @@ export function RunView({ runId, initial }: { runId: string; initial: Run | null
               ))}
             </div>
           </div>
+          <RevenueAtRisk findings={before.findings} after={run?.verify?.audit.findings} />
           {Object.entries(before.shoppers).map(([d, s]) =>
             s?.summary ? (
               <blockquote key={d} className="border-l-2 border-border pl-4 text-sm text-muted">

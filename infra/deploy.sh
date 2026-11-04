@@ -58,7 +58,7 @@ deploy_agent() {
   demo_env="DEMO_EMBER_OAK_URL=$(url_of store-ember-oak),DEMO_LUMEN_URL=$(url_of store-lumen-bakehouse)"
   demo_env+=",SHERPA_PUBLIC_URL=$(url_of sherpa-agent)"
   secrets="$(secret_flags SHERPA_API_KEY KERNEL_API_KEY PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET \
-    PAYPAL_WEBHOOK_ID PAYPAL_SANDBOX_BUYER_EMAIL PAYPAL_SANDBOX_BUYER_PASSWORD GITHUB_TOKEN)"
+    PAYPAL_WEBHOOK_ID PAYPAL_SANDBOX_BUYER_EMAIL PAYPAL_SANDBOX_BUYER_PASSWORD GITHUB_TOKEN CHANNEL3_API_KEY)"
   gcloud run deploy sherpa-agent --source "$ROOT/services/agent" --region "$REGION" \
     --service-account "$SA" --allow-unauthenticated --memory 4Gi --cpu 2 --timeout 3600 \
     --concurrency 40 --min-instances 0 --max-instances 1 --no-cpu-throttling \

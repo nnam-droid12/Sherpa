@@ -21,6 +21,7 @@ from sherpa.fixer.agent import run_fixer
 from sherpa.fixer.pr import pr_body, scorecard_comment
 from sherpa.fixer.tools import Workspace
 from sherpa.gitrepo import clone, parse_repo
+from sherpa.shelf import build_shelf
 from sherpa.store.runs import RunStore
 from sherpa.verify.preview import deploy_preview
 
@@ -295,6 +296,7 @@ async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any
     except Exception as exc:
         await emit("warning", message=f"Catalog feed unreadable: {exc}")
     await emit("catalog", url=f"{preview_url}/catalog.json", count=len(feed), items=feed[:6])
+    shelf = await shelf_job(feed, emit)
     item_id = feed[0]["id"] if feed else ""
     date = next_weekday(5, min_days=7).isoformat()
 
@@ -322,8 +324,25 @@ async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any
             "transcript": buyer["transcript"],
             "order": buyer["order"],
             "pr_url": fix["pr_url"],
-        }
+        },
+        "shelf": shelf,
     }
+
+
+async def shelf_job(
+    feed: list[dict[str, Any]], emit: Callable[..., Awaitable[None]]
+) -> dict[str, Any] | None:
+    """Agent Shelf never fails the stage: it is market context, not a pass/fail check."""
+    if not feed:
+        return None
+    await emit("log", message="Agent Shelf: searching the open web the way a shopper's AI agent would")
+    try:
+        shelf = await build_shelf(feed)
+    except Exception as exc:
+        await emit("warning", message=f"Agent Shelf unavailable: {exc}")
+        return None
+    await emit("shelf", **shelf)
+    return shelf
 
 
 @dataclass(frozen=True)

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     paypal_buyer_password: str = Field(default="", alias="PAYPAL_SANDBOX_BUYER_PASSWORD")
 
     kernel_api_key: str = Field(default="", alias="KERNEL_API_KEY")
+    channel3_api_key: str = Field(default="", alias="CHANNEL3_API_KEY")
     github_token: str = Field(default="", alias="GITHUB_TOKEN")
 
     cors_origins: str = Field(default="*", alias="SHERPA_CORS_ORIGINS")

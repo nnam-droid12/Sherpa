@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 
+import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
@@ -16,6 +17,7 @@ from sherpa.fleet import MAX_STORES, scan
 from sherpa.logging import configure_logging
 from sherpa.pipeline import STAGES, audit_job, spawn
 from sherpa.ratelimit import enforce, enforce_fleet
+from sherpa.shelf import build_shelf
 from sherpa.store.artifacts import get_artifacts, sign
 from sherpa.store.runs import get_store
 
@@ -199,6 +201,30 @@ async def start_autopilot(run_id: str) -> dict:
     spec = STAGES[nxt]
     spawn(store, run_id, spec.name, lambda: spec.job(store, run))
     return await store.update_run(run_id, status=f"{spec.name}:running", stage=spec.name)
+
+
+@app.post("/api/runs/{run_id}/shelf", dependencies=[Depends(require_api_key), Depends(enforce_fleet)])
+async def agent_shelf(run_id: str) -> dict:
+    """Build the Agent Shelf for a run that finished agent-ready before the shelf existed."""
+    store = get_store()
+    run = await store.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "run not found")
+    if run.get("shelf"):
+        return run
+    ready = run.get("agent_ready")
+    if not ready:
+        raise HTTPException(409, "run Make agent-ready first: the shelf compares the store's catalog feed")
+    feed = ready.get("catalog_preview") or []
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            feed = (await c.get(f"{ready['preview_url']}/catalog.json")).json().get("items") or feed
+    except Exception:
+        log.info("preview catalog unavailable; using the stored preview items")
+    shelf = await build_shelf(feed)
+    if not shelf.get("available"):
+        raise HTTPException(503, shelf.get("reason", "Agent Shelf is unavailable"))
+    return await store.update_run(run_id, shelf=shelf)
 
 
 @app.post("/api/runs/{run_id}/stop", dependencies=[Depends(require_api_key)])

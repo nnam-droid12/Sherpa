@@ -77,6 +77,7 @@ export type Run = {
   agent_ready?: AgentReady;
   usage?: { model_calls: number; browser_minutes: number; steps: number; seconds: number };
   stop_requested?: boolean;
+  autopilot?: boolean;
 };
 
 export type RunEvent = {

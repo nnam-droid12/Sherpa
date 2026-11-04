@@ -17,6 +17,7 @@ export function NewRunForm() {
   const [storeUrl, setStoreUrl] = useState("");
   const [repo, setRepo] = useState("");
   const [storeType, setStoreType] = useState("auto");
+  const [autopilot, setAutopilot] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -32,6 +33,7 @@ export function NewRunForm() {
           store_url: storeUrl,
           repo: repo || null,
           store_type: storeType === "auto" ? detectType(repo, storeUrl) : storeType,
+          autopilot: autopilot && !!repo,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -76,6 +78,19 @@ export function NewRunForm() {
           </select>
         </label>
       </div>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={autopilot}
+          disabled={!repo}
+          onChange={(e) => setAutopilot(e.target.checked)}
+          className="mt-0.5 size-4 accent-[var(--accent)]"
+        />
+        <span>
+          <span className="font-medium">⚡ Autopilot</span>{" "}
+          <span className="text-muted">run Fix, Verify and Agent-ready automatically after the audit (needs a repo)</span>
+        </span>
+      </label>
       {error && (
         <p role="alert" className="text-sm text-bad">
           {error}

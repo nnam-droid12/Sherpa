@@ -12,8 +12,8 @@ export function DemoLauncher({ demos }: { demos: DemoStore[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  async function start(d: DemoStore) {
-    setBusy(d.id);
+  async function start(d: DemoStore, autopilot = false) {
+    setBusy(autopilot ? `${d.id}:auto` : d.id);
     setError("");
     try {
       const res = await fetch("/api/agent/runs", {
@@ -24,6 +24,7 @@ export function DemoLauncher({ demos }: { demos: DemoStore[] }) {
           repo: d.repo,
           store_type: d.id === "lumen-bakehouse" ? "nextjs" : "static-express",
           demo_store: d.id,
+          autopilot,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -67,6 +68,14 @@ export function DemoLauncher({ demos }: { demos: DemoStore[] }) {
                   className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg transition hover:opacity-90 disabled:opacity-60"
                 >
                   {busy === d.id ? "Starting…" : "Run live audit"}
+                </button>
+                <button
+                  onClick={() => start(d, true)}
+                  disabled={busy !== null}
+                  title="Audit, fix, verify and make agent-ready, back to back with no clicks"
+                  className="rounded-lg border border-accent/50 px-4 py-2 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:opacity-60"
+                >
+                  {busy === `${d.id}:auto` ? "Starting…" : "⚡ Full autopilot"}
                 </button>
                 {d.recent_run_id && (
                   <Link

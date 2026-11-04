@@ -98,6 +98,21 @@ export function MissionBar({
         </ol>
 
         <div className="flex flex-wrap items-center gap-2">
+          {run?.autopilot && !complete && (
+            <span className="rounded-lg bg-accent/10 px-3 py-2 text-sm font-medium text-accent" title="Each stage starts the next automatically">
+              ⚡ Autopilot on
+            </span>
+          )}
+          {!run?.autopilot && run?.repo && run?.audit && !complete && !running && (
+            <button
+              onClick={() => onAction("autopilot")}
+              disabled={busy}
+              title="Run every remaining stage back to back"
+              className="rounded-lg border border-accent/50 px-3 py-2 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:opacity-60"
+            >
+              ⚡ Autopilot the rest
+            </button>
+          )}
           {run?.fix?.pr_url && (
             <a
               href={run.fix.pr_url}

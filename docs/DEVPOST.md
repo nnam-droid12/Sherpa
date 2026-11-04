@@ -16,8 +16,14 @@ Give Sherpa a store URL and its GitHub repo.
 
 1. **Audit:** two AI shoppers powered by Gemini computer use open real KERNEL cloud browsers, one desktop and one phone, and try to buy something with PayPal while you watch live. Deterministic checks measure SDK version, button placement, Venmo, Pay Later, server-side correctness and agent readiness. The result is a 0–100 scorecard with screenshots, replays and plain-English findings.
 2. **Fix:** a Gemini 3.8 Flash coding agent edits the repo in front of you, in a live code editor with diffs. It upgrades to JS SDK v6, puts PayPal and Venmo above the fold, adds Pay Later messaging, moves pricing to the server, verifies webhook signatures and adds graceful error handling. It can't finish until the build passes and Sherpa's own checks agree. Then it opens a real pull request written for the merchant.
-3. **Verify:** Sherpa deploys the PR as a private Cloud Run preview, re-runs the shoppers, completes a real PayPal sandbox payment, confirms it through the Orders API, and posts a before/after scorecard on the PR. On our demo store the score went from **15 to 86** with a `COMPLETED` sandbox order.
+3. **Verify:** Sherpa deploys the PR as a private Cloud Run preview, re-runs the shoppers, completes a real PayPal sandbox payment, confirms it through the Orders API, and posts a before/after scorecard on the PR. On our demo store the score went from **15 to 100** with a `COMPLETED` sandbox order.
 4. **Agent-ready:** the coding agent adds a catalog feed and the PayPal Cart API endpoints, contract tests run live, and an AI buyer agent shops the store through the API: *"I need a birthday cake for 12 people delivered Saturday, under $90."* It handles the store's validation questions and checks out through PayPal.
+
+On top of the four stages:
+
+- **⚡ Autopilot** runs all four stages back to back from one click.
+- **Revenue at risk** turns findings into an estimated monthly PayPal revenue at risk, from the merchant's own traffic and order value, with every assumption visible and editable, and shows the estimated revenue recovered after Verify.
+- **Fleet scan** ranks up to 25 stores by checkout health in seconds in an AG Grid table, for platforms and agencies that look after many merchants, with a deep audit one click away.
 
 ## How we built it
 
@@ -31,6 +37,7 @@ Give Sherpa a store URL and its GitHub repo.
 - **KERNEL** cloud browsers over CDP with Playwright, plus live view embedded in the console and session replays.
 - **PayPal:** JS SDK v6, Orders v2, Webhooks with `verify-webhook-signature`, Venmo, Pay Later messaging, Cart API v1, the Agent Toolkit, and the official `paypal/AI-Toolkit` best-practice references as grounding.
 - **Google Cloud:** Cloud Run (console, agent, stores, tagged preview revisions), Cloud Build, Artifact Registry, Firestore, Cloud Storage and Secret Manager.
+- **AG Grid** for the fleet scan table.
 - **Next.js 15** console with server-sent events, and **FastAPI** for the agent.
 
 ## Challenges

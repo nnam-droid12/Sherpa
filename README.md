@@ -29,6 +29,12 @@ Agentic commerce has the same bottleneck. Before an AI agent can buy from a stor
 | **3. Verify** | Sherpa deploys the PR branch as a tagged, no-traffic Cloud Run revision, re-runs the same shopper on desktop and mobile, completes a real sandbox payment, confirms it through the Orders API, and posts a before/after scorecard on the PR. |
 | **4. Agent-ready** | The coding agent adds a product catalog feed and the PayPal Cart API v1 endpoints (`/merchant-cart`) wired to PayPal Orders, plus contract tests. An AI buyer agent then discovers the store and buys through PayPal: *"I need a birthday cake for 12 people delivered Saturday, under $90."* |
 
+### Beyond the four stages
+
+- **⚡ Autopilot.** One click runs Audit → Fix → Verify → Agent-ready back to back. It can also be switched on part-way through a run ("Autopilot the rest"), and it stops cleanly on Stop or on a failed stage.
+- **Revenue at risk.** The scorecard turns findings into an estimated monthly PayPal revenue at risk. The merchant enters sessions, conversion rate, average order, PayPal share and mobile share; every per-finding loss assumption is shown and editable, overlapping issues are combined without double counting, and after Verify it shows the estimated revenue recovered. It is labelled as an estimate, not measured data.
+- **Fleet scan** (`/fleet`). Platforms and agencies paste up to 25 store URLs and get them ranked by checkout health, worst first, in an AG Grid table: PayPal SDK version, Venmo, Pay Later, catalog feed and Cart API. It uses no browsers or model calls, finishes in seconds, refuses private and metadata addresses, and each row opens a deep audit.
+
 ### Results on the demo stores
 
 Two intentionally flawed fictional stores ship with Sherpa. Every planted flaw is listed in [`docs/SCORECARD.md`](docs/SCORECARD.md).
@@ -90,13 +96,14 @@ All model calls run on **Gemini Enterprise Agent Platform (formerly Vertex AI)**
 
 ## Other tools
 
-KERNEL cloud browsers (live view and replays) · Google Cloud Run · Cloud Build · Artifact Registry · Firestore · Cloud Storage · Secret Manager · GitHub REST API.
+KERNEL cloud browsers (live view and replays) · AG Grid (fleet scan) · Google Cloud Run · Cloud Build · Artifact Registry · Firestore · Cloud Storage · Secret Manager · GitHub REST API.
 
 ## Try it in 2 minutes
 
 1. Open the [console](https://sherpa-web-854441956422.us-east1.run.app).
 2. Click **Use Ember & Oak** or **Use Lumen Bakehouse**, then **Start audit**. Or click **View a recent run instantly** to open a finished run.
-3. Watch the live browser and timeline, then follow **Fix it → Deploy preview & verify → Make agent-ready**.
+3. Watch the live browser and timeline, then follow **Fix it → Deploy preview & verify → Make agent-ready**, or press **⚡ Full autopilot** to run all four with no clicks.
+4. Open **Fleet scan**, press **Use the demo stores**, then **Scan** to rank stores by checkout health.
 
 Public runs are rate limited per visitor to protect cloud credits.
 

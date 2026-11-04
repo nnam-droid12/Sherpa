@@ -117,3 +117,51 @@ async def test_orphaned_stage_is_marked_interrupted_and_retryable():
     store._runs[run["id"]]["updated_at"] = _time.time() - STALE_SECONDS - 5
     settled = await store.get_run(run["id"])
     assert settled["status"] == "fix:failed" and settled["error"] == INTERRUPTED
+
+
+async def test_autopilot_chains_stages_until_agent_ready(monkeypatch):
+    import asyncio
+
+    from sherpa import pipeline
+    from sherpa.store.runs import RunStore
+
+    order: list[str] = []
+
+    def stage(name, key, requires):
+        async def job(store, run):
+            order.append(name)
+            return {key: {"ok": True}}
+
+        return pipeline.Stage(name, requires, job)
+
+    monkeypatch.setattr(
+        pipeline,
+        "STAGES",
+        {
+            "fix": stage("fix", "fix", ("audit", "repo")),
+            "verify": stage("verify", "verify", ("fix",)),
+            "agent-ready": stage("agent_ready", "agent_ready", ("fix",)),
+        },
+    )
+    store = RunStore(use_firestore=False)
+    run = await store.create_run({"store_url": "https://s.example", "repo": "o/r", "autopilot": True})
+    await store.update_run(run["id"], audit={"total": 15})
+    await pipeline.continue_autopilot(store, await store.get_run(run["id"]), "audit")
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if (await store.get_run(run["id"]))["status"] == "agent_ready:done":
+            break
+    assert order == ["fix", "verify", "agent_ready"]
+    assert (await store.get_run(run["id"]))["status"] == "agent_ready:done"
+
+
+async def test_autopilot_off_does_not_chain(monkeypatch):
+    from sherpa import pipeline
+    from sherpa.store.runs import RunStore
+
+    called = []
+    monkeypatch.setattr(pipeline, "spawn", lambda *a, **k: called.append(a))
+    store = RunStore(use_firestore=False)
+    run = await store.create_run({"store_url": "https://s.example", "repo": "o/r"})
+    await pipeline.continue_autopilot(store, run, "audit")
+    assert called == []

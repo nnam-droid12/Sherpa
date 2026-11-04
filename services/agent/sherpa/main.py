@@ -98,6 +98,7 @@ class NewRun(BaseModel):
     repo: str | None = None
     store_type: str = "auto"
     demo_store: str | None = None
+    autopilot: bool = False
 
 
 @app.post("/api/runs", dependencies=[Depends(require_api_key), Depends(enforce)])
@@ -109,6 +110,8 @@ async def create_run(body: NewRun) -> dict:
             "repo": body.repo or None,
             "store_type": body.store_type,
             "demo_store": body.demo_store,
+            # Autopilot needs a repo: fix, verify and agent-ready all work on the pull request.
+            "autopilot": bool(body.autopilot and body.repo),
         }
     )
     spawn(store, run["id"], "audit", lambda: audit_job(store, run))
@@ -161,6 +164,28 @@ async def get_artifact(art_id: str) -> Response:
         raise HTTPException(404, "artifact not found")
     data, content_type = found
     return Response(data, media_type=content_type, headers={"Cache-Control": "private, max-age=86400"})
+
+
+@app.post("/api/runs/{run_id}/autopilot", dependencies=[Depends(require_api_key), Depends(enforce)])
+async def start_autopilot(run_id: str) -> dict:
+    """Turn on autopilot and start the next stage; each later stage then starts on its own."""
+    store = get_store()
+    run = await store.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "run not found")
+    if not run.get("repo"):
+        raise HTTPException(409, "autopilot needs a GitHub repo")
+    run = await store.update_run(run_id, autopilot=True)
+    if str(run.get("status", "")).endswith(":running"):
+        return run  # the running stage hands over to the next one when it finishes
+    order = ["audit", "fix", "verify", "agent-ready"]
+    done = {"audit": "audit", "fix": "fix", "verify": "verify", "agent-ready": "agent_ready"}
+    nxt = next((st for st in order if not run.get(done[st])), None)
+    if nxt is None:
+        return run
+    spec = STAGES[nxt]
+    spawn(store, run_id, spec.name, lambda: spec.job(store, run))
+    return await store.update_run(run_id, status=f"{spec.name}:running", stage=spec.name)
 
 
 @app.post("/api/runs/{run_id}/stop", dependencies=[Depends(require_api_key)])

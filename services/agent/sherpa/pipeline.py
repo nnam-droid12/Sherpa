@@ -103,7 +103,8 @@ def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[
             patch = await work
             run = await store.get_run(run_id) or {}
             patch["usage"] = add_usage(run.get("usage"), patch, time.monotonic() - started)
-            await store.update_run(run_id, status=f"{stage}:done", **patch)
+            done = await store.update_run(run_id, status=f"{stage}:done", **patch)
+            await continue_autopilot(store, done, stage)
         except asyncio.CancelledError:
             # Cloud browsers and clones are released by each stage's finally blocks.
             await store.add_event(run_id, "warning", phase=stage, message="Stopped by the user.")
@@ -121,6 +122,28 @@ def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[
     task = asyncio.create_task(wrapper())
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
+
+
+# Autopilot runs every stage back to back: audit → fix → verify → agent-ready.
+AUTOPILOT_NEXT = {"audit": "fix", "fix": "verify", "verify": "agent-ready"}
+
+
+async def continue_autopilot(store: RunStore, run: dict[str, Any], finished: str) -> None:
+    nxt = AUTOPILOT_NEXT.get(finished)
+    if not nxt or not run.get("autopilot") or run.get("stop_requested"):
+        return
+    spec = STAGES[nxt]
+    missing = [r for r in spec.requires if not run.get(r)]
+    if missing:
+        await store.add_event(
+            run["id"],
+            "warning",
+            phase=finished,
+            message=f"Autopilot stopped: {nxt} needs {', '.join(missing)}.",
+        )
+        return
+    await store.add_event(run["id"], "log", phase=spec.name, message=f"Autopilot: starting {nxt}.")
+    spawn(store, run["id"], spec.name, lambda: spec.job(store, run))
 
 
 def emitter(store: RunStore, run_id: str, phase: str):

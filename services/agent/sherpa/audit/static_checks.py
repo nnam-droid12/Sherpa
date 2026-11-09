@@ -16,17 +16,25 @@ import httpx
 LEGACY_SDK_RE = re.compile(r"""https://www\.(?:sandbox\.)?paypal\.com/sdk/js\?[^"'\s>`]*""", re.I)
 V6_SDK_RE = re.compile(r"""https://www\.(?:sandbox\.)?paypal\.com/web-sdk/v6/core""", re.I)
 PAY_LATER_RE = re.compile(
-    r"""(paypal-message|data-pp-message|paypal\.Messages|createPayPalMessages|PayLaterMessage)"""
+    r"""(paypal-message|data-pp-message|paypal\.Messages|createPayPalMessages|PayLaterMessage"""
+    # v5 Buttons can show Pay Later messaging themselves: paypal.Buttons({ message: { amount } })
+    r"""|\bmessage\s*:\s*\{[^}]*\bamount\b)"""
 )
 VENMO_V6_RE = re.compile(r"""(venmo-button|createVenmoOneTimePaymentSession|VenmoButton)""", re.I)
 AMOUNT_FROM_CLIENT_RE = re.compile(r"""req\.body\b[^\n]*\btotal\b|\{\s*total\s*\}\s*=\s*req\.body""")
 VERIFY_SIG_RE = re.compile(r"""verify-webhook-signature|verifyWebhookSignature""")
+# A visible message when payment fails (PayPal's own sample: "Sorry, your transaction could not be processed").
+ERROR_UI_RE = re.compile(
+    r"""(role=["']alert["']|onError|try again|retry|could not be processed|payment (failed|was declined))""",
+    re.I,
+)
 PAYMENT_GATE_RE = re.compile(r"""(Choose|Select) (a )?payment method""", re.I)
 BLANK_PAGE_RE = re.compile(r"""document\.body\.innerHTML\s*=\s*["']{2}""")
 # Server code that talks to PayPal Orders v2; the resilience checks below only apply to it.
-ORDERS_API_RE = re.compile(r"""/v2/checkout/orders""")
+# Raw REST calls, or PayPal's official server SDK (@paypal/paypal-server-sdk OrdersController).
+ORDERS_API_RE = re.compile(r"""/v2/checkout/orders|\bOrdersController\b|\bordersController\.\w+Order\b""")
 DECLINED_RE = re.compile(r"""INSTRUMENT_DECLINED""")
-IDEMPOTENCY_RE = re.compile(r"""PayPal-Request-Id""", re.I)
+IDEMPOTENCY_RE = re.compile(r"""PayPal-Request-Id|\bpaypalRequestId\b""", re.I)
 PENDING_RE = re.compile(r"""["'`]PENDING["'`]""")
 DEDUPE_RE = re.compile(
     r"""\b(processed|seen|handled|delivered)\w*\s*\.\s*(has|add|includes|exists)\s*\("""
@@ -154,7 +162,7 @@ def analyze_source(files: dict[str, str]) -> ServerSignals:
         if PAYMENT_GATE_RE.search(text):
             s.payment_gated = True
             s.evidence.setdefault("payment_gated", path)
-        if re.search(r"""(role=["']alert["']|onError|try again|retry)""", text, re.I):
+        if ERROR_UI_RE.search(text):
             has_error_ui = True
     if not has_webhook_handler:
         s.evidence["webhook_missing"] = "no webhook handler found"

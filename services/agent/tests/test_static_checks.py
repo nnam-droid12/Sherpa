@@ -85,3 +85,27 @@ def test_logging_an_event_id_is_not_deduplication():
 def test_resilience_needs_server_orders_calls():
     s = sc.analyze_source({"public/app.js": "paypal.Buttons({ onApprove: (d, a) => a.order.capture() })"})
     assert s.calls_orders_api is False
+
+
+def test_official_server_sdk_counts_as_orders_calls():
+    # PayPal's own standard-integration sample uses @paypal/paypal-server-sdk, not raw REST URLs.
+    s = sc.analyze_source(
+        {
+            "server.js": "const ordersController = new OrdersController(client);\nawait ordersController.createOrder(collect);"
+        }
+    )
+    assert s.calls_orders_api and not s.idempotent_requests
+    s = sc.analyze_source(
+        {"server.js": "await ordersController.captureOrder({ id, paypalRequestId: randomUUID() });"}
+    )
+    assert s.calls_orders_api and s.idempotent_requests
+
+
+def test_v5_buttons_message_option_is_pay_later():
+    assert sc.has_pay_later("paypal.Buttons({ style: {}, message: { amount: 100 }, createOrder() {} })")
+    assert not sc.has_pay_later("resultMessage(`Sorry, your transaction could not be processed`)")
+
+
+def test_paypal_sample_error_message_counts_as_error_ui():
+    s = sc.analyze_source({"app.js": "resultMessage(`Sorry, your transaction could not be processed...`)"})
+    assert s.graceful_errors is True

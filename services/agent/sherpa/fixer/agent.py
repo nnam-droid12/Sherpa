@@ -61,6 +61,10 @@ rejects unverified events with 400, and handles PAYMENT.CAPTURE.COMPLETED, PAYME
 CHECKOUT.ORDER.APPROVED.
 7. Handle failures gracefully: on a declined or failed payment (including INSTRUMENT_DECLINED) show a visible message \
 in an element with role="alert" and a "Try again" path; never blank the page.
+8. Recover from declined funding: when the capture response from PayPal is INSTRUMENT_DECLINED (check the error's details[].issue), return a clear response so the page shows a role="alert" message and lets the buyer choose another payment method (start a new payment session), instead of ending the checkout.
+9. Make PayPal calls retry-safe: send a unique `PayPal-Request-Id` header (crypto.randomUUID()) on every POST to /v2/checkout/orders and /v2/checkout/orders/{id}/capture.
+10. Treat a capture whose status is "PENDING" as not yet paid: only mark the order paid for a "COMPLETED" capture and tell the buyer a PENDING payment is being reviewed.
+11. Deduplicate webhooks: keep a `processedEvents` Set of event ids, and when `processedEvents.has(event.id)` return 200 without processing the event again.
 Do not add a catalog feed or Cart API endpoints in this change; a separate agent-ready step does that."""
 
 
@@ -142,6 +146,17 @@ def self_check(ws: Workspace) -> list[str]:
         )
     if server.payment_gated:
         problems.append("PayPal is still behind a 'Choose payment method' click.")
+    if server.calls_orders_api:
+        if not server.declined_recovery:
+            problems.append(
+                "INSTRUMENT_DECLINED from capture is not handled with a choose-another-method path."
+            )
+        if not server.idempotent_requests:
+            problems.append("PayPal order create/capture calls do not send a PayPal-Request-Id header.")
+        if not server.pending_handled:
+            problems.append('A "PENDING" capture status is not distinguished from "COMPLETED".')
+    if server.webhook_signature_verified and not server.webhook_deduped:
+        problems.append("The webhook handler does not skip event ids it has already processed.")
     return problems
 
 

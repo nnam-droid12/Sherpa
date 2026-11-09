@@ -104,6 +104,55 @@ def device_evidence_from_probes(
     return d
 
 
+def resilience(s: ServerSignals, add, find) -> None:
+    """PayPal production practices, checked only when the store's server calls the Orders API itself."""
+    where = s.evidence.get("orders_api")
+    if not s.calls_orders_api:
+        add("server_correctness", 6)  # the store does not call the Orders API directly: nothing to get wrong
+        return
+    if s.declined_recovery:
+        add("server_correctness", 2)
+    else:
+        find(
+            "DECLINED_NOT_RECOVERED",
+            "server_correctness",
+            "medium",
+            "A declined card ends the checkout instead of letting the shopper pick another way to pay",
+            code=where,
+        )
+    if s.idempotent_requests:
+        add("server_correctness", 2)
+    else:
+        find(
+            "REQUESTS_NOT_IDEMPOTENT",
+            "server_correctness",
+            "medium",
+            "PayPal calls can't be retried safely after a timeout (no PayPal-Request-Id)",
+            code=where,
+        )
+    if s.pending_handled:
+        add("server_correctness", 1)
+    else:
+        find(
+            "PENDING_TREATED_AS_PAID",
+            "server_correctness",
+            "medium",
+            "A PENDING capture is treated the same as a completed payment",
+            code=where,
+        )
+    if s.webhook_signature_verified or "webhook_unverified" in s.evidence:
+        if s.webhook_deduped:
+            add("server_correctness", 1)
+        else:
+            find(
+                "WEBHOOK_NOT_DEDUPED",
+                "server_correctness",
+                "low",
+                "Repeated webhook deliveries are processed again",
+                code=s.evidence.get("webhook_signature_verified") or s.evidence.get("webhook_unverified"),
+            )
+
+
 def score(ev: AuditEvidence) -> Score:
     cats: dict[str, dict[str, int]] = {k: {"score": 0, "max": v} for k, v in WEIGHTS.items()}
     findings: list[Finding] = []
@@ -235,9 +284,9 @@ def score(ev: AuditEvidence) -> Score:
                 code=s.evidence.get("amount_from_client"),
             )
         else:
-            add("server_correctness", 8)
+            add("server_correctness", 6)
         if s.webhook_signature_verified:
-            add("server_correctness", 7)
+            add("server_correctness", 5)
         elif "webhook_unverified" in s.evidence:
             find(
                 "WEBHOOK_UNVERIFIED",
@@ -257,7 +306,7 @@ def score(ev: AuditEvidence) -> Score:
                 code=s.evidence.get("blank_page_on_error"),
             )
         elif s.graceful_errors:
-            add("server_correctness", 5)
+            add("server_correctness", 3)
         else:
             find(
                 "NO_ERROR_HANDLING",
@@ -265,6 +314,7 @@ def score(ev: AuditEvidence) -> Score:
                 "medium",
                 "Payment errors are not shown to the shopper",
             )
+        resilience(s, add, find)
     else:
         if ev.probes.webhook_endpoint:
             add("server_correctness", 3)

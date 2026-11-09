@@ -23,6 +23,16 @@ AMOUNT_FROM_CLIENT_RE = re.compile(r"""req\.body\b[^\n]*\btotal\b|\{\s*total\s*\
 VERIFY_SIG_RE = re.compile(r"""verify-webhook-signature|verifyWebhookSignature""")
 PAYMENT_GATE_RE = re.compile(r"""(Choose|Select) (a )?payment method""", re.I)
 BLANK_PAGE_RE = re.compile(r"""document\.body\.innerHTML\s*=\s*["']{2}""")
+# Server code that talks to PayPal Orders v2; the resilience checks below only apply to it.
+ORDERS_API_RE = re.compile(r"""/v2/checkout/orders""")
+DECLINED_RE = re.compile(r"""INSTRUMENT_DECLINED""")
+IDEMPOTENCY_RE = re.compile(r"""PayPal-Request-Id""", re.I)
+PENDING_RE = re.compile(r"""["'`]PENDING["'`]""")
+DEDUPE_RE = re.compile(
+    r"""\b(processed|seen|handled|delivered)\w*\s*\.\s*(has|add|includes|exists)\s*\("""
+    r"""|\bduplicate\b|already\s+(processed|handled|seen)""",
+    re.I,
+)
 WEBHOOK_PATHS = ("/api/webhooks/paypal", "/api/paypal/webhook", "/webhooks/paypal", "/api/webhook")
 FEED_PATHS = (
     "/catalog.json",
@@ -93,6 +103,12 @@ class ServerSignals:
     blank_page_on_error: bool | None = None
     graceful_errors: bool | None = None
     payment_gated: bool | None = None
+    # PayPal resilience: only meaningful when the store's server calls the Orders API itself.
+    calls_orders_api: bool | None = None
+    declined_recovery: bool | None = None
+    idempotent_requests: bool | None = None
+    pending_handled: bool | None = None
+    webhook_deduped: bool | None = None
     evidence: dict[str, str] = field(default_factory=dict)
 
 
@@ -105,6 +121,8 @@ def analyze_source(files: dict[str, str]) -> ServerSignals:
     s.payment_gated = False
     has_webhook_handler = False
     has_error_ui = False
+    s.calls_orders_api = s.declined_recovery = s.idempotent_requests = s.pending_handled = False
+    s.webhook_deduped = False
     for path, text in files.items():
         if TEST_PATH_RE.search(path):
             continue
@@ -118,6 +136,18 @@ def analyze_source(files: dict[str, str]) -> ServerSignals:
                 s.evidence["webhook_signature_verified"] = path
             else:
                 s.evidence.setdefault("webhook_unverified", path)
+            if DEDUPE_RE.search(text):
+                s.webhook_deduped = True
+                s.evidence.setdefault("webhook_deduped", path)
+        if ORDERS_API_RE.search(text):
+            s.calls_orders_api = True
+            s.evidence.setdefault("orders_api", path)
+            if IDEMPOTENCY_RE.search(text):
+                s.idempotent_requests = True
+            if PENDING_RE.search(text):
+                s.pending_handled = True
+        if DECLINED_RE.search(text):
+            s.declined_recovery = True
         if BLANK_PAGE_RE.search(text):
             s.blank_page_on_error = True
             s.evidence.setdefault("blank_page_on_error", path)

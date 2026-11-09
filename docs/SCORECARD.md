@@ -16,7 +16,7 @@ Gemini only writes the plain-English wording of each finding (impact and recomme
 | SDK modernity | 10 | JS SDK v6 (10) · legacy v5 `paypal.com/sdk/js` (0) |
 | Mobile checkout completion | 15 | Shopper reaches a visible PayPal button on mobile (7) · mobile sandbox payment completes (8) |
 | Steps to pay | 10 | No extra clicks between checkout and PayPal (10), −5 per extra click; a crash on the way scores 0 |
-| Server-side correctness | 20 | Order amount computed or verified server-side (8) · webhook endpoint with signature verification (7) · graceful payment errors with a retry path (5) |
+| Server-side correctness | 20 | Order amount computed or verified server-side (6) · webhook endpoint with signature verification (5) · graceful payment errors with a retry path (3) · PayPal production practices when the server calls Orders v2: `INSTRUMENT_DECLINED` recovery (2), `PayPal-Request-Id` on order calls (2), `PENDING` captures not treated as paid (1), webhook events deduplicated (1) |
 | Agent readiness | 10 | Product catalog feed (4) · PayPal Cart API v1 endpoints respond to the contract (6) |
 
 Each finding carries a **severity** (critical, high, medium, low), **evidence** (a screenshot step or a code reference), the **business impact** in plain English, and the **recommended fix**.

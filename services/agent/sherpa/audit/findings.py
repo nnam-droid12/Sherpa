@@ -81,6 +81,25 @@ DEFAULTS: dict[str, tuple[str, str]] = {
         "Failed payments give no feedback, so shoppers are left guessing.",
         "Handle onError and failed captures with a visible message and a retry path.",
     ),
+    "DECLINED_NOT_RECOVERED": (
+        "When PayPal declines the chosen card or bank, the sale is lost even though the shopper still wants to pay.",
+        "When capture returns INSTRUMENT_DECLINED, send the shopper back to choose another funding source, as "
+        "PayPal recommends, instead of ending the checkout.",
+    ),
+    "REQUESTS_NOT_IDEMPOTENT": (
+        "If a call to PayPal times out, retrying it can repeat the request instead of returning the first result.",
+        "Send a unique PayPal-Request-Id header on order create and capture so retries are safe.",
+    ),
+    "PENDING_TREATED_AS_PAID": (
+        "Some payments, like unclear eChecks or ones under review, are only PENDING; shipping them risks losing the "
+        "goods.",
+        "Check the capture status: fulfil only COMPLETED captures and wait for PAYMENT.CAPTURE.COMPLETED for "
+        "PENDING ones.",
+    ),
+    "WEBHOOK_NOT_DEDUPED": (
+        "PayPal retries webhook deliveries (up to 25 times over 3 days), so one event can be processed twice.",
+        "Remember each processed event id and ignore repeats.",
+    ),
     "NO_CATALOG_FEED": (
         "AI shopping agents cannot discover what the store sells.",
         "Publish a JSON catalog feed with ids, titles, prices, availability and images.",

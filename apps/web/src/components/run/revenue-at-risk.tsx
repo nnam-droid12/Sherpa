@@ -34,6 +34,10 @@ const RISK_ONLY: Record<string, string> = {
   WEBHOOK_MISSING: "Captures that fail or reverse after checkout go unnoticed.",
   NO_CATALOG_FEED: "Invisible to AI shopping agents.",
   NO_CART_API: "AI agents can't buy from the store.",
+  DECLINED_NOT_RECOVERED: "A declined card ends the sale instead of offering another way to pay.",
+  REQUESTS_NOT_IDEMPOTENT: "Timed-out PayPal calls can't be retried safely.",
+  PENDING_TREATED_AS_PAID: "Orders could ship before a PENDING payment clears.",
+  WEBHOOK_NOT_DEDUPED: "A retried webhook could be processed twice.",
 };
 
 const KEY = "sherpa-revenue-inputs";

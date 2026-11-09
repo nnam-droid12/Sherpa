@@ -57,3 +57,31 @@ def test_tests_that_quote_old_code_are_not_store_behaviour():
     assert s.blank_page_on_error is False
     assert s.amount_from_client is False
     assert s.graceful_errors is True
+
+
+def test_paypal_resilience_signals():
+    server = {
+        "server.js": (
+            'await fetch(`${base}/v2/checkout/orders/${id}/capture`, {headers: {"PayPal-Request-Id": randomUUID()}});\n'
+            'if (issue === "INSTRUMENT_DECLINED") return res.status(422).json({ retry: true });\n'
+            'if (capture.status === "PENDING") return res.json({ pending: true });'
+        ),
+        "routes/webhooks.js": (
+            "await verifyWebhookSignature(req);\n"
+            "if (processedEvents.has(event.id)) return res.sendStatus(200);\n"
+            "processedEvents.add(event.id);"
+        ),
+    }
+    s = sc.analyze_source(server)
+    assert s.calls_orders_api and s.declined_recovery and s.idempotent_requests and s.pending_handled
+    assert s.webhook_deduped
+
+
+def test_logging_an_event_id_is_not_deduplication():
+    s = sc.analyze_source({"routes/webhooks.js": "verifyWebhookSignature(); console.log(event.id);"})
+    assert s.webhook_deduped is False
+
+
+def test_resilience_needs_server_orders_calls():
+    s = sc.analyze_source({"public/app.js": "paypal.Buttons({ onApprove: (d, a) => a.order.capture() })"})
+    assert s.calls_orders_api is False

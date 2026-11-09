@@ -109,3 +109,11 @@ def test_v5_buttons_message_option_is_pay_later():
 def test_paypal_sample_error_message_counts_as_error_ui():
     s = sc.analyze_source({"app.js": "resultMessage(`Sorry, your transaction could not be processed...`)"})
     assert s.graceful_errors is True
+
+
+def test_message_objects_outside_paypal_buttons_are_not_pay_later():
+    assert not sc.has_pay_later('showToast({ message: { text: "Saved", amount: 3 } })')
+    sample = (
+        'window.paypal.Buttons({ style: { shape: "rect", layout: "vertical" }, message: { amount: 100 } })'
+    )
+    assert sc.has_pay_later(sample)

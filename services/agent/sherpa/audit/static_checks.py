@@ -16,9 +16,9 @@ import httpx
 LEGACY_SDK_RE = re.compile(r"""https://www\.(?:sandbox\.)?paypal\.com/sdk/js\?[^"'\s>`]*""", re.I)
 V6_SDK_RE = re.compile(r"""https://www\.(?:sandbox\.)?paypal\.com/web-sdk/v6/core""", re.I)
 PAY_LATER_RE = re.compile(
-    r"""(paypal-message|data-pp-message|paypal\.Messages|createPayPalMessages|PayLaterMessage"""
-    # v5 Buttons can show Pay Later messaging themselves: paypal.Buttons({ message: { amount } })
-    r"""|\bmessage\s*:\s*\{[^}]*\bamount\b)"""
+    r"""(paypal-message|data-pp-message|paypal\.Messages|createPayPalMessages|<PayLaterMessage\b"""
+    # v5 Buttons can show Pay Later messaging themselves: paypal.Buttons({ ..., message: { amount } })
+    r"""|\.Buttons\s*\(\s*\{(?:[^{}]|\{[^{}]*\})*?\bmessage\s*:\s*\{[^}]*\bamount\b)"""
 )
 VENMO_V6_RE = re.compile(r"""(venmo-button|createVenmoOneTimePaymentSession|VenmoButton)""", re.I)
 AMOUNT_FROM_CLIENT_RE = re.compile(r"""req\.body\b[^\n]*\btotal\b|\{\s*total\s*\}\s*=\s*req\.body""")

@@ -5,6 +5,7 @@ import type { Run, RunEvent } from "@/lib/types";
 import { FixWorkspace } from "../fix-workspace";
 import { LiveView } from "../live-view";
 import { AgentShelf } from "./agent-shelf";
+import { McpConnect } from "./mcp-connect";
 import type { StageState } from "./mission-bar";
 
 type FeedItem = {
@@ -214,6 +215,11 @@ export function AgentReadyPanel({ run, events, state }: { run: Run | null; event
           <Step n={5} title="AI buyer agent" sub="Gemini function calling drives the Cart API; the PayPal Agent Toolkit checks the order.">
             <Chat messages={chat} order={order} running={running} hasBrowser={hasBrowser} events={events} />
           </Step>
+          {run?.agent_ready && (
+            <Step n={6} title="Connect any AI assistant (MCP)" sub="The store as an MCP server: any MCP-capable assistant can search, fill a cart and pay through PayPal.">
+              <McpConnect run={run} />
+            </Step>
+          )}
         </>
       )}
     </div>

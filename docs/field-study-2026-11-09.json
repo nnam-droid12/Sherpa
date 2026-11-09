@@ -1,0 +1,47 @@
+{
+ "stores_found": 186,
+ "stores_reachable": 118,
+ "paypal_seen_on_public_pages": 16,
+ "of_paypal_stores": {
+  "legacy_v5_sdk_pct": 100.0,
+  "v6_sdk_pct": 0.0,
+  "no_venmo_pct": 100.0,
+  "no_pay_later_messaging_pct": 87.5
+ },
+ "of_all_reachable_stores": {
+  "catalog_feed_at_common_paths_pct": 46.6
+ },
+ "seconds": 662,
+ "queries": [
+  "running shoes",
+  "yoga mat",
+  "coffee beans",
+  "dog food",
+  "face serum",
+  "phone case",
+  "wireless earbuds",
+  "wooden toys",
+  "board game",
+  "scented candle",
+  "loose leaf tea",
+  "hiking backpack",
+  "sunglasses",
+  "mechanical watch",
+  "silver necklace",
+  "graphic t-shirt",
+  "hoodie",
+  "chef knife",
+  "cast iron skillet",
+  "linen bed sheets",
+  "desk lamp",
+  "ceramic plant pot",
+  "bike light",
+  "camping tent",
+  "fishing lure",
+  "golf balls",
+  "multivitamin",
+  "protein powder",
+  "watercolor paint set",
+  "leather wallet"
+ ]
+}

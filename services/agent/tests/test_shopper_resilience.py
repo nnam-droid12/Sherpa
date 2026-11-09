@@ -83,6 +83,8 @@ def test_playwright_driver_crash_is_an_infra_error():
     ("typed", "iso"),
     [
         ("11/20/2026", "2026-11-20"),
+        ("11202026", "2026-11-20"),  # typed into a phone's segmented mm/dd/yyyy field
+        ("20261120", "2026-11-20"),
         ("2026-11-20", "2026-11-20"),
         ("November 20, 2026", "2026-11-20"),
         ("20 Nov 2026", "2026-11-20"),

@@ -229,7 +229,18 @@ async def _active_screenshot(b: _Browser) -> bytes:
     raise BrowserGone("The cloud browser closed every page")
 
 
-DATE_FORMATS = ("%m/%d/%Y", "%Y-%m-%d", "%m-%d-%Y", "%d %B %Y", "%B %d, %Y", "%b %d, %Y", "%d %b %Y")
+# Digits-only forms ("11202026") are what shoppers type into segmented mm/dd/yyyy fields on phones.
+DATE_FORMATS = (
+    "%m/%d/%Y",
+    "%Y-%m-%d",
+    "%m-%d-%Y",
+    "%m%d%Y",
+    "%Y%m%d",
+    "%d %B %Y",
+    "%B %d, %Y",
+    "%b %d, %Y",
+    "%d %b %Y",
+)
 
 # Sets the focused date-like <input> with the native setter and fires input/change, so React and plain pages
 # both see it. Returns false (and changes nothing) when the focused element is not a date-like input.

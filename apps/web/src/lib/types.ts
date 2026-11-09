@@ -46,11 +46,23 @@ export type FixResult = {
   tool_calls: number;
 };
 
+export type AttackOutcome = {
+  verdict: "vulnerable" | "blocked" | "missing" | "unknown" | "skipped";
+  detail: string;
+  request?: string;
+  status?: number;
+  order_id?: string;
+  amount?: string;
+};
+
+export type Attack = { id: string; title: string; threat: string; before: AttackOutcome; after: AttackOutcome };
+
 export type VerifyResult = {
   preview_url: string;
   audit: Audit;
   order: { id: string; status: string } | null;
   comment_url?: string;
+  attacks?: Attack[] | null;
 };
 
 export type AgentReady = {

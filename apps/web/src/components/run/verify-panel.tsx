@@ -4,6 +4,7 @@ import { scoreTone } from "@/lib/score";
 import { artifactUrl, type Run, type RunEvent } from "@/lib/types";
 import { CategoryBars } from "../category-bars";
 import { LiveView } from "../live-view";
+import { AttackReplay } from "./attack-replay";
 import type { StageState } from "./mission-bar";
 
 const PLAN = [
@@ -151,6 +152,7 @@ export function VerifyPanel({ run, events, state }: { run: Run | null; events: R
               </div>
             ))}
           </div>
+          {run && <AttackReplay run={run} events={events} />}
           <CategoryBars categories={verify.audit.categories} compare={before.categories} />
         </>
       )}

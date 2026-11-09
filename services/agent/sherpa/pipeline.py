@@ -23,6 +23,7 @@ from sherpa.fixer.tools import Workspace
 from sherpa.gitrepo import clone, parse_repo
 from sherpa.shelf import build_shelf
 from sherpa.store.runs import RunStore
+from sherpa.verify.attacks import replay as attack_replay
 from sherpa.verify.preview import deploy_preview
 
 log = logging.getLogger(__name__)
@@ -232,16 +233,41 @@ async def verify_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any]:
 
     shoppers = after.get("shoppers", {})
     order = (shoppers.get("mobile") or {}).get("order") or (shoppers.get("desktop") or {}).get("order")
+    attacks = await attacks_job(run, preview_url, emit)
     comment_url = ""
     try:
         comment_url = await github.comment(
-            repo, fix["pr_number"], scorecard_comment(run["audit"], after, preview_url, order)
+            repo, fix["pr_number"], scorecard_comment(run["audit"], after, preview_url, order, attacks)
         )
     except Exception as exc:
         await emit("warning", message=f"Could not comment on the PR: {exc}")
     return {
-        "verify": {"preview_url": preview_url, "audit": after, "order": order, "comment_url": comment_url}
+        "verify": {
+            "preview_url": preview_url,
+            "audit": after,
+            "order": order,
+            "comment_url": comment_url,
+            "attacks": attacks,
+        }
     }
+
+
+async def attacks_job(
+    run: dict[str, Any], preview_url: str, emit: Callable[..., Awaitable[None]]
+) -> list[dict] | None:
+    """Replay real attacks on the store before and after the fix. Never fails the stage."""
+    # The original store is attacked only when it is a known sandbox demo store; previews always are.
+    before_url = run["store_url"] if run.get("demo_store") else None
+    await emit("log", message="Attack replay: trying price tampering and a forged PayPal webhook")
+    try:
+        attacks = await attack_replay(before_url, preview_url)
+    except Exception as exc:
+        log.warning("attack replay failed", exc_info=True)
+        await emit("warning", message=f"Attack replay could not run: {exc}")
+        return None
+    for a in attacks:
+        await emit("attack", id=a["id"], title=a["title"], before=a["before"], after=a["after"])
+    return attacks
 
 
 BUYER_REQUESTS = {

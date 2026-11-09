@@ -72,7 +72,11 @@ def pr_body(audit: dict[str, Any], outcome: Any, store_url: str) -> str:
 
 
 def scorecard_comment(
-    before: dict[str, Any], after: dict[str, Any], preview_url: str, order: dict | None
+    before: dict[str, Any],
+    after: dict[str, Any],
+    preview_url: str,
+    order: dict | None,
+    attacks: list[dict] | None = None,
 ) -> str:
     lines = [
         "## Sherpa verification",
@@ -99,6 +103,10 @@ def scorecard_comment(
             lines.append(f"- {device.title()} shopper {status}{replay}.")
     if order:
         lines.append(f"- Sandbox order `{order['id']}`: **{order['status']}** (checked with the Orders API).")
+    if attacks:
+        lines += ["", "### Attack replay", "", "| Attack | Before | After |", "|---|---|---|"]
+        for a in attacks:
+            lines.append(f"| {a['title']} | {a['before']['detail']} | {a['after']['detail']} |")
     remaining = after.get("findings", [])
     if remaining:
         lines += ["", "Still open:"] + [f"- {f['severity']}: {f['title']}" for f in remaining]

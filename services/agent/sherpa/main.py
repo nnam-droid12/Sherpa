@@ -15,7 +15,7 @@ from sherpa import __version__
 from sherpa.config import Settings, get_settings
 from sherpa.fleet import MAX_STORES, scan
 from sherpa.logging import configure_logging
-from sherpa.pipeline import STAGES, audit_job, spawn
+from sherpa.pipeline import STAGES, attacks_job, audit_job, emitter, spawn
 from sherpa.ratelimit import enforce, enforce_fleet
 from sherpa.shelf import build_shelf
 from sherpa.store.artifacts import get_artifacts, sign
@@ -225,6 +225,24 @@ async def agent_shelf(run_id: str, refresh: bool = False) -> dict:
     if not shelf.get("available"):
         raise HTTPException(503, shelf.get("reason", "Agent Shelf is unavailable"))
     return await store.update_run(run_id, shelf=shelf)
+
+
+@app.post("/api/runs/{run_id}/attacks", dependencies=[Depends(require_api_key), Depends(enforce_fleet)])
+async def attack_replay(run_id: str, refresh: bool = False) -> dict:
+    """Replay the attacks for a run that was verified before attack replay existed."""
+    store = get_store()
+    run = await store.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "run not found")
+    verify = run.get("verify")
+    if not verify:
+        raise HTTPException(409, "run Deploy preview & verify first: the attacks need the fixed preview")
+    if verify.get("attacks") and not refresh:
+        return run
+    attacks = await attacks_job(run, verify["preview_url"], emitter(store, run_id, "verify"))
+    if attacks is None:
+        raise HTTPException(503, "attack replay could not run")
+    return await store.update_run(run_id, verify={**verify, "attacks": attacks})
 
 
 @app.post("/api/runs/{run_id}/stop", dependencies=[Depends(require_api_key)])

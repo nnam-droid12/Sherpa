@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import io
 import logging
 import re
@@ -228,6 +229,32 @@ async def _active_screenshot(b: _Browser) -> bytes:
     raise BrowserGone("The cloud browser closed every page")
 
 
+DATE_FORMATS = ("%m/%d/%Y", "%Y-%m-%d", "%m-%d-%Y", "%d %B %Y", "%B %d, %Y", "%b %d, %Y", "%d %b %Y")
+
+# Sets the focused date-like <input> with the native setter and fires input/change, so React and plain pages
+# both see it. Returns false (and changes nothing) when the focused element is not a date-like input.
+SET_DATE_JS = """(iso) => {
+  const el = document.activeElement;
+  if (!el || el.tagName !== "INPUT" || !["date", "datetime-local", "month"].includes(el.type)) return false;
+  const value = el.type === "month" ? iso.slice(0, 7) : el.type === "datetime-local" ? `${iso}T12:00` : iso;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}"""
+
+
+def to_iso_date(text: str) -> str | None:
+    """Turn a typed date such as 11/20/2026 into 2026-11-20; None when the text is not a date."""
+    text = text.strip()
+    for fmt in DATE_FORMATS:
+        try:
+            return dt.datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
 async def _execute(
     b: _Browser, name: str, args: dict[str, Any], allowed_hosts: set[str], store_url: str
 ) -> str | None:
@@ -281,6 +308,10 @@ async def _execute(
     elif name in ("type_text_at", "type"):
         if "x" in args and "y" in args:
             await page.mouse.click(_px(args["x"], w), _px(args["y"], h))
+        # Native date pickers ignore typed digits in many browsers; set the ISO value the way the page expects.
+        iso = to_iso_date(str(args.get("text", "")))
+        if iso and await page.evaluate(SET_DATE_JS, iso):
+            return None
         if args.get("clear_before_typing", True) and name == "type_text_at":
             await page.keyboard.press("Control+A")
             await page.keyboard.press("Backspace")

@@ -77,3 +77,21 @@ async def test_only_browser_failures_without_payment_are_retried_once():
 
 def test_playwright_driver_crash_is_an_infra_error():
     assert shopper.is_infra_error(Exception("Connection closed while reading from the driver"))
+
+
+@pytest.mark.parametrize(
+    ("typed", "iso"),
+    [
+        ("11/20/2026", "2026-11-20"),
+        ("2026-11-20", "2026-11-20"),
+        ("November 20, 2026", "2026-11-20"),
+        ("20 Nov 2026", "2026-11-20"),
+    ],
+)
+def test_typed_dates_become_iso(typed, iso):
+    assert shopper.to_iso_date(typed) == iso
+
+
+@pytest.mark.parametrize("typed", ["Alex Rivera", "500 Market St", "94105", "13/45/2026"])
+def test_non_dates_are_left_alone(typed):
+    assert shopper.to_iso_date(typed) is None

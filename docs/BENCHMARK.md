@@ -55,8 +55,11 @@ Every run that reached Verify, as stored on the live system. Scores from differe
 |---|---|---|---|---|
 | `c95caeb6056d` | Ember & Oak | 15 → 100 | COMPLETED | All four stages |
 | `3cafdd0bfbc9` | Ember & Oak | 15 → 85 | COMPLETED | Sherpa's checker flagged a fixer-written test that quoted the old blank-page code. Fixed: tests are no longer read as store code |
-| `823477e9b5a3` | Ember & Oak | 15 → 82 | COMPLETED (desktop) | First run with the PayPal production checks: server-side correctness 20/20, both attacks blocked. The phone browser disconnected mid-checkout. Fixed: Sherpa now keeps the PayPal orders it saw and retries a device once after a cloud-browser failure |
+| `823477e9b5a3` (Verify re-run) | Ember & Oak | 15 → **100** | COMPLETED (desktop and mobile) | Re-run on the fixed system under the stricter rubric: server-side correctness 20/20, both attacks blocked, no skipped devices |
+| `823477e9b5a3` (first Verify) | Ember & Oak | 15 → 82 | COMPLETED (desktop) | First run with the PayPal production checks: server-side correctness 20/20, both attacks blocked. The phone browser disconnected mid-checkout. Fixed: Sherpa now keeps the PayPal orders it saw and retries a device once after a cloud-browser failure |
 | `03cde58b09e9` | Ember & Oak | 15 → 50 | none | The cloud-browser API key had expired, so no shopper could open a browser |
 | `06eebdce06ea` | Lumen Bakehouse | 18 → 82 | none | Recorded before the KERNEL key and browser fixes |
+
+A second Verify re-run on 9 November hit a different infrastructure fault: a rebuilt image was missing `libatomic1`, so Playwright's driver couldn't start, and that run scored 65 with no shopper able to open a browser. The image now installs it, and the build runs `playwright --version`, so a broken image fails the build instead of a live run. Driver crashes also count as infrastructure errors (retried, then marked "not tested" instead of "failed").
 
 Every failure above was traced to a cause in Sherpa or its infrastructure, and each has a fix and a test.

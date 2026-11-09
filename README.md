@@ -26,7 +26,7 @@ Agentic commerce has the same bottleneck. Before an AI agent can buy from a stor
 |---|---|
 | **1. Audit** | A Gemini computer-use agent shops the live store in KERNEL cloud browsers on desktop (1440×900) and mobile (390×844). It finds a product over $200, adds it to the cart and tries to pay with PayPal, narrating as it goes. Deterministic checks measure the button position, SDK version, Venmo and Pay Later, webhooks and agent-readiness. Every step is recorded with screenshots and a session replay. |
 | **2. Fix** | A Gemini 3.8 Flash coding agent reads the repo and makes the changes: JS SDK v6, PayPal and Venmo above the fold, Pay Later messaging, server-side amount checks, verified webhooks, graceful errors. It must pass the build and Sherpa's own acceptance checks before it can finish. Then it opens a real pull request written for the merchant. |
-| **3. Verify** | Sherpa deploys the PR branch as a tagged, no-traffic Cloud Run revision, re-runs the same shopper on desktop and mobile, completes a real sandbox payment, confirms it through the Orders API, and posts a before/after scorecard on the PR. |
+| **3. Verify** | Sherpa deploys the PR branch as a tagged, no-traffic Cloud Run revision, re-runs the same shopper on desktop and mobile, completes a real sandbox payment, confirms it through the Orders API, replays real attacks against the store before and after the fix, and posts a before/after scorecard on the PR. |
 | **4. Agent-ready** | The coding agent adds a product catalog feed and the PayPal Cart API v1 endpoints (`/merchant-cart`) wired to PayPal Orders, plus contract tests. An AI buyer agent then discovers the store and buys through PayPal: *"I need a birthday cake for 12 people delivered Saturday, under $90."* |
 
 ### Beyond the four stages
@@ -36,13 +36,26 @@ Agentic commerce has the same bottleneck. Before an AI agent can buy from a stor
 - **Agent Shelf.** After Agent-ready, Sherpa shows what a shopper's AI agent finds on the open web for the store's own products. Gemini writes the search a shopper's agent would send, [Channel3](https://trychannel3.com) returns live products and in-stock retailer offers, Gemini keeps only real alternatives, and the console plots the store's price against the market (min, median, max). When nothing comparable exists, as with Lumen's cakes, it says so, rather than padding the shelf with lookalikes.
 - **Fleet scan** (`/fleet`). Platforms and agencies paste up to 25 store URLs and get them ranked by checkout health, worst first, in an AG Grid table: PayPal SDK version, Venmo, Pay Later, catalog feed and Cart API. It uses no browsers or model calls, finishes in seconds, refuses private and metadata addresses, and each row opens a deep audit.
 
+### Proof, not promises
+
+- **Attack replay.** Verify tries two real attacks on the store, before and after the fix, in the PayPal sandbox. It sends a $1.00 order for a $349 tent through the store's own order endpoint and reads the amount back from the Orders API. It also sends a forged `PAYMENT.CAPTURE.COMPLETED` webhook. On Ember & Oak: before the fix, PayPal created the order for **$1.00** and the forgery was accepted (HTTP 200). After it, the order was **$349.00** and the forgery was rejected (HTTP 400). Only stores Sherpa can prove are sandbox are attacked, and attack orders are never captured.
+- **PayPal production practices.** The audit and the fixer cover what a PayPal engineer checks in review, each grounded in PayPal's docs:
+  - recovering from `INSTRUMENT_DECLINED` so the shopper can pick another way to pay
+  - `PayPal-Request-Id` on order calls so retries are safe
+  - never treating a `PENDING` capture as paid
+  - ignoring repeated webhook deliveries (PayPal retries up to 25 times over 3 days)
+- **Any AI assistant can shop an agent-ready store (MCP).** Each agent-ready store gets an MCP endpoint (Streamable HTTP) with 7 tools over its catalog feed and PayPal Cart API. Payment approval is a PayPal link for the human. It's tested with the official MCP Python SDK client ([`scripts/mcp_interop.py`](services/agent/scripts/mcp_interop.py)). PayPal documents no merchant-side MCP server, so this is Sherpa's bridge, not a PayPal product.
+- **A benchmark you can rerun.** [`docs/BENCHMARK.md`](docs/BENCHMARK.md): 11 PayPal flaws planted in Sherpa-fixed code across 126 variants. Sherpa reports exactly the planted flaws in **126 of 126**, with **0 false alarms**. The benchmark's first run caught two detection bugs, which are now fixed, and it runs in the test suite.
+- **The problem is real.** [`docs/FIELD_STUDY.md`](docs/FIELD_STUDY.md): of 186 real retailers (found through Channel3 and scanned read-only), every store that loads PayPal on its public pages (16 of 16) still uses the legacy JS SDK v5, and 14 of 16 show no Pay Later messaging.
+- **Resilient by design.** A cloud-browser failure is retried once and never scored as the store's fault. A broken image fails the build, not a live run.
+
 ### Results on the demo stores
 
 Two intentionally flawed fictional stores ship with Sherpa. Every planted flaw is listed in [`docs/SCORECARD.md`](docs/SCORECARD.md).
 
 | Store | Planted flaws found by the audit | Score before | Score after |
 |---|---|---|---|
-| Ember & Oak (HTML/JS + Express) | 9 / 9 | 15 | **100**: desktop and mobile sandbox payments `COMPLETED`; Cart API contract tests 8/8; AI buyer agent order `COMPLETED` ([PR #1](https://github.com/nnam-droid12/sherpa-demo-ember-oak/pull/1)) |
+| Ember & Oak (HTML/JS + Express) | 9 / 9 | 15 | **100** under the stricter rubric with PayPal production practices: desktop and mobile sandbox payments `COMPLETED`, both attacks blocked ([PR #4](https://github.com/nnam-droid12/sherpa-demo-ember-oak/pull/4)) |
 | Lumen Bakehouse (Next.js) | 7 / 7 | 18 | **82** on the preview; Cart API contract tests 8/8; the AI buyer agent bought a $78 birthday cake for Saturday delivery, order `COMPLETED` ([PR #1](https://github.com/nnam-droid12/sherpa-demo-lumen-bakehouse/pull/1)) |
 
 ## Architecture
@@ -67,7 +80,9 @@ flowchart LR
   - `audit/`: the computer-use shopper, static checks, the deterministic rubric and the findings writer
   - `fixer/`: the coding agent, its sandboxed tools and the GitHub flow
   - `verify/`: preview deploys through the Cloud Build and Cloud Run Admin APIs
-  - `agentready/`: the Cart API contract and contract tests
+  - `agentready/`: the Cart API contract, contract tests and the MCP endpoint
+  - `verify/attacks.py`: the attack replay
+  - `bench/` and `scripts/`: the detection benchmark, the field study and the MCP interop check
   - `buyer/`: the AI buyer agent
 - **Scores are deterministic.** Gemini writes only the plain-English wording of each finding. Weights and checks are in [`docs/SCORECARD.md`](docs/SCORECARD.md).
 
@@ -78,7 +93,8 @@ More detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · design decisions:
 | PayPal product | Where |
 |---|---|
 | **JS SDK v6** (`web-sdk/v6/core`, `createInstance`, `findEligibleMethods`, payment sessions, web components) | What the fixer migrates stores to; the audit detects v5 vs v6 |
-| **Orders v2** | Store checkout, server-side amount checks, payment confirmation in verify |
+| **Orders v2** | Store checkout, server-side amount checks, payment confirmation in verify, and reading back attack orders |
+| **`PayPal-Request-Id`, `INSTRUMENT_DECLINED`, capture `PENDING`** | Audited and fixed as production practices (idempotent retries, declined-funding recovery, pending captures) |
 | **Venmo** (`venmo-payments`, `<venmo-button>`) | Added by the fixer for eligible US buyers |
 | **Pay Later messaging** (`paypal-messages`, `<paypal-message>`) | Added on product and cart pages |
 | **Webhooks + `verify-webhook-signature`** | Added by the fixer for `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED` and `CHECKOUT.ORDER.APPROVED` |

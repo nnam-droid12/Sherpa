@@ -10,6 +10,7 @@ import { FindingCard } from "./finding-card";
 import { FixWorkspace } from "./fix-workspace";
 import { LiveView } from "./live-view";
 import { AgentReadyPanel } from "./run/agent-ready-panel";
+import { IncompleteNote } from "./run/incomplete-note";
 import { RevenueAtRisk } from "./run/revenue-at-risk";
 import { MissionBar, stageState, type StageState } from "./run/mission-bar";
 import { VerifyPanel } from "./run/verify-panel";
@@ -157,6 +158,7 @@ export function RunView({ runId, initial }: { runId: string; initial: Run | null
             </button>
           }
         >
+          <IncompleteNote audit={before} />
           <div className="grid gap-6 lg:grid-cols-[1fr_1.6fr]">
             <CategoryBars categories={before.categories} />
             <div className="grid content-start gap-3">

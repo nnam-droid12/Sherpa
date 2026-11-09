@@ -136,6 +136,15 @@ async def run_audit(
         lambda d: run_shopper(store_url, d, emit, extra_hosts=extra_hosts, save_shot=save_shot),  # type: ignore[arg-type]
         emit,
     )
+    # Still failing after the retry: the device was not tested, which is not the same as the store failing it.
+    untested = [
+        d for d, r in by_device.items() if r is not None and r.infra_error and not r.payment_completed
+    ]
+    for d in untested:
+        await emit(
+            "warning",
+            message=f"The {d} shopper could not run (cloud browser failure); {d} checks were skipped",
+        )
 
     probe_pay_later = any(
         p.get("pay_later_message") for r in by_device.values() if r for p in r.probes if "error" not in p
@@ -145,8 +154,8 @@ async def run_audit(
         pay_later=sc.has_pay_later(corpus) or probe_pay_later,
         venmo=sc.has_venmo(sdk, corpus),
         probes=probes,
-        desktop=_device(by_device["desktop"]),
-        mobile=_device(by_device["mobile"]),
+        desktop=_device(None if "desktop" in untested else by_device["desktop"]),
+        mobile=_device(None if "mobile" in untested else by_device["mobile"]),
         server=server,
     )
     result = score(evidence)
@@ -183,6 +192,7 @@ async def run_audit(
             "probes": asdict(probes),
         },
         "shoppers": shoppers,
+        "incomplete": untested,
     }
     await emit("score", total=result.total, categories=result.categories)
     await emit("phase", status="done", total=result.total)

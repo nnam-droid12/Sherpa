@@ -73,3 +73,7 @@ async def test_only_browser_failures_without_payment_are_retried_once():
     reruns.clear()
     await runner.retry_browser_failures({"desktop": paid_anyway}, rerun, emit)
     assert reruns == []
+
+
+def test_playwright_driver_crash_is_an_infra_error():
+    assert shopper.is_infra_error(Exception("Connection closed while reading from the driver"))

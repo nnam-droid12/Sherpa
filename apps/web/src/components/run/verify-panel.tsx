@@ -5,6 +5,7 @@ import { artifactUrl, type Run, type RunEvent } from "@/lib/types";
 import { CategoryBars } from "../category-bars";
 import { LiveView } from "../live-view";
 import { AttackReplay } from "./attack-replay";
+import { IncompleteNote } from "./incomplete-note";
 import type { StageState } from "./mission-bar";
 
 const PLAN = [
@@ -95,6 +96,7 @@ export function VerifyPanel({ run, events, state }: { run: Run | null; events: R
 
       {verify && before && (
         <>
+          <IncompleteNote audit={verify.audit} />
           <div className="grid items-center gap-6 lg:grid-cols-[auto_1fr_auto]">
             <div className="flex items-center gap-4">
               <div className="text-center">

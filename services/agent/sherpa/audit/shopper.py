@@ -341,8 +341,13 @@ def _prune_screenshots(history: list[types.Content]) -> None:
 
 def is_infra_error(exc: BaseException) -> bool:
     """The cloud browser or its connection failed, as opposed to something the store did."""
-    name = type(exc).__name__
-    return isinstance(exc, BrowserGone) or name in {"TargetClosedError"} or "has been closed" in str(exc)
+    text = str(exc)
+    return (
+        isinstance(exc, BrowserGone)
+        or type(exc).__name__ == "TargetClosedError"
+        or "has been closed" in text
+        or "Connection closed while reading from the driver" in text
+    )
 
 
 async def run_shopper(

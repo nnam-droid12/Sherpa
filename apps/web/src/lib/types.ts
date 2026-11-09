@@ -33,6 +33,8 @@ export type Audit = {
   findings: Finding[];
   shoppers: Partial<Record<"desktop" | "mobile", ShopperSummary>>;
   evidence: Record<string, unknown>;
+  /** Devices whose cloud browser failed even after a retry; their checks were skipped, not failed. */
+  incomplete?: string[];
 };
 
 export type FixResult = {

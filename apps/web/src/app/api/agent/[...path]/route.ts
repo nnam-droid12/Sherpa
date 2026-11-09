@@ -6,15 +6,24 @@ export const dynamic = "force-dynamic";
 const AGENT_URL = process.env.SHERPA_AGENT_URL || "http://localhost:8080";
 const API_KEY = process.env.SHERPA_API_KEY || "";
 
+function foreignOrigin(origin: string, host: string | null): boolean {
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
+}
+
 async function forward(req: NextRequest, path: string[]) {
   const target = new URL(`/api/${path.map(encodeURIComponent).join("/")}`, AGENT_URL);
   target.search = req.nextUrl.search;
   const headers: Record<string, string> = { "X-Sherpa-Key": API_KEY };
   const contentType = req.headers.get("content-type");
   if (contentType) headers["Content-Type"] = contentType;
-  // The MCP endpoint must validate Origin to stop browser pages from driving it (DNS rebinding).
+  // The MCP endpoint must validate Origin to stop other sites' pages from driving it (DNS rebinding).
+  // This console's own pages are same-origin; only a foreign Origin is passed on for the agent to reject.
   const origin = req.headers.get("origin");
-  if (origin) headers["Origin"] = origin;
+  if (origin && foreignOrigin(origin, req.headers.get("host"))) headers["Origin"] = origin;
   const forwardedFor = req.headers.get("x-forwarded-for");
   if (forwardedFor) headers["X-Client-Ip"] = forwardedFor.split(",")[0].trim();
 

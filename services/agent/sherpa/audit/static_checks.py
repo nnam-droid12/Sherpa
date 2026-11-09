@@ -32,6 +32,8 @@ FEED_PATHS = (
     "/api/catalog/feed",
 )
 CART_API_PATH = "/merchant-cart"
+# Tests often quote the very code they guard against, so they never count as the store's behaviour.
+TEST_PATH_RE = re.compile(r"(^|/)(tests?|__tests__|e2e|spec)/|\.(test|spec)\.[cm]?[jt]sx?$", re.I)
 
 
 @dataclass
@@ -104,6 +106,8 @@ def analyze_source(files: dict[str, str]) -> ServerSignals:
     has_webhook_handler = False
     has_error_ui = False
     for path, text in files.items():
+        if TEST_PATH_RE.search(path):
+            continue
         if AMOUNT_FROM_CLIENT_RE.search(text):
             s.amount_from_client = True
             s.evidence.setdefault("amount_from_client", path)

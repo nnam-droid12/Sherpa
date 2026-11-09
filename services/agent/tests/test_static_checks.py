@@ -44,3 +44,16 @@ def test_verified_webhook_source():
     files = {"server/webhooks.js": "await fetch(`${base}/v1/notifications/verify-webhook-signature`)"}
     s = sc.analyze_source(files)
     assert s.webhook_signature_verified is True
+
+
+def test_tests_that_quote_old_code_are_not_store_behaviour():
+    # A fixer-written regression test names the blank-page code it guards against.
+    files = {
+        "views/cart.html": '<div role="alert">Payment failed, try again</div>',
+        "test/store.test.js": "assert.ok(!html.includes('document.body.innerHTML = \"\"'));",
+        "src/cart.spec.ts": "const { total } = req.body;",
+    }
+    s = sc.analyze_source(files)
+    assert s.blank_page_on_error is False
+    assert s.amount_from_client is False
+    assert s.graceful_errors is True

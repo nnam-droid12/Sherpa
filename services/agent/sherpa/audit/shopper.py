@@ -28,7 +28,8 @@ Emit = Callable[..., Awaitable[Any]]
 
 GOAL = (
     "You are a careful first-time shopper. Find a product priced above $200, add it to the cart, proceed to "
-    "checkout and pay with PayPal using the sandbox buyer account. Narrate what you see at each step, especially "
+    "checkout and pay with PayPal using the sandbox buyer account. If the store sells a single item or only shows "
+    "a payment button, buy that instead. Narrate what you see at each step, especially "
     "where payment options appear, whether PayPal, Venmo or Pay Later are offered, and anything confusing or broken."
 )
 RULES = (

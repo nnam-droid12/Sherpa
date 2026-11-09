@@ -58,7 +58,15 @@ async def commit_and_push(workdir: Path, branch: str, message: str, paths: list[
         "\n".join(["node_modules/", ".next/", "dist/", "build/", "coverage/", ".env", ".env.*"]) + "\n",
         encoding="utf-8",
     )
-    await git(workdir, "add", "--all", "--", *(paths or ["."]))
+    try:
+        await git(workdir, "add", "--all", "--", *(paths or ["."]))
+    except RuntimeError:
+        # One listed path can be ignored or already gone; stage the whole tree (build output stays excluded).
+        await git(workdir, "add", "--all", "--", ".")
+    staged, _ = await run("git", "diff", "--cached", "--quiet", cwd=workdir, timeout=60)
+    if staged == 0:
+        # Nothing new to commit (for example, re-running a stage on a branch that already has its changes).
+        return (await git(workdir, "rev-parse", "HEAD")).strip()
     name, email = AUTHOR
     await git(workdir, "-c", f"user.name={name}", "-c", f"user.email={email}", "commit", "-m", message)
     await git(workdir, "push", "--force", "origin", f"HEAD:refs/heads/{branch}", timeout=180)

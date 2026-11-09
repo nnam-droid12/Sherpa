@@ -122,7 +122,7 @@ async def _own_scripts(c: httpx.AsyncClient, base: str, html: str) -> list[str]:
     return out
 
 
-async def check_store(url: str) -> StoreHealth:
+async def check_store(url: str, probe_cart: bool = True) -> StoreHealth:
     h = StoreHealth(url=url.rstrip("/"))
     base = h.url + "/"
     try:
@@ -170,7 +170,9 @@ async def check_store(url: str) -> StoreHealth:
                     if isinstance(items, list) and items and isinstance(items[0], dict):
                         h.catalog_feed, h.catalog_items = path, len(items)
                         break
-                h.cart_api = bool((await probe_cart_api(base, c)).get("present"))
+                # The Cart API probe is an empty POST; read-only studies of third-party stores skip it.
+                if probe_cart:
+                    h.cart_api = bool((await probe_cart_api(base, c)).get("present"))
     except BlockedHost as exc:
         h.error = str(exc)
     except TimeoutError:

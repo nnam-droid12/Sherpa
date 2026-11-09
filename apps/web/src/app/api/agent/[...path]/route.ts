@@ -12,6 +12,9 @@ async function forward(req: NextRequest, path: string[]) {
   const headers: Record<string, string> = { "X-Sherpa-Key": API_KEY };
   const contentType = req.headers.get("content-type");
   if (contentType) headers["Content-Type"] = contentType;
+  // The MCP endpoint must validate Origin to stop browser pages from driving it (DNS rebinding).
+  const origin = req.headers.get("origin");
+  if (origin) headers["Origin"] = origin;
   const forwardedFor = req.headers.get("x-forwarded-for");
   if (forwardedFor) headers["X-Client-Ip"] = forwardedFor.split(",")[0].trim();
 

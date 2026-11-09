@@ -12,6 +12,7 @@ from pydantic import BaseModel, HttpUrl
 from sse_starlette.sse import EventSourceResponse
 
 from sherpa import __version__
+from sherpa.agentready import mcp
 from sherpa.config import Settings, get_settings
 from sherpa.fleet import MAX_STORES, scan
 from sherpa.logging import configure_logging
@@ -243,6 +244,34 @@ async def attack_replay(run_id: str, refresh: bool = False) -> dict:
     if attacks is None:
         raise HTTPException(503, "attack replay could not run")
     return await store.update_run(run_id, verify={**verify, "attacks": attacks})
+
+
+@app.post("/api/mcp/{run_id}", dependencies=[Depends(require_api_key), Depends(enforce_fleet)])
+async def mcp_endpoint(run_id: str, request: Request, origin: str | None = Header(default=None)) -> Response:
+    """MCP (Streamable HTTP) endpoint for an agent-ready store: any MCP client can search, cart and pay."""
+    allowed = {o.strip() for o in settings.cors_origins.split(",")}
+    if origin and origin not in allowed:
+        raise HTTPException(403, "origin not allowed")
+    run = await get_store().get_run(run_id)
+    ready = (run or {}).get("agent_ready")
+    if not ready or not ready.get("preview_url"):
+        raise HTTPException(404, "no agent-ready store for this run")
+    try:
+        message = await request.json()
+    except ValueError:
+        return Response(json.dumps(mcp.ERROR_PARSE), status_code=400, media_type="application/json")
+    async with httpx.AsyncClient(timeout=30) as http:
+        tools = mcp.StoreTools(ready["preview_url"], http)
+        reply = await mcp.handle(message, tools, run.get("demo_store") or run["store_url"])
+    if reply is None:
+        return Response(status_code=202)
+    return Response(json.dumps(reply), media_type="application/json")
+
+
+@app.get("/api/mcp/{run_id}", dependencies=[Depends(require_api_key)])
+async def mcp_stream(run_id: str) -> Response:
+    # This server never pushes messages, so it offers no SSE stream (allowed by the spec).
+    return Response(status_code=405, headers={"Allow": "POST"})
 
 
 @app.post("/api/runs/{run_id}/stop", dependencies=[Depends(require_api_key)])

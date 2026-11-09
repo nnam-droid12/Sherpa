@@ -73,3 +73,47 @@ async def test_sdk_loaded_from_own_script_is_found(public):
         )
         h = await fleet.check_store("https://spa.example")
     assert h.paypal and h.sdk == "v5"
+
+
+@pytest.mark.asyncio
+async def test_read_only_scan_never_posts(public):
+    with respx.mock(assert_all_called=False) as mock:
+        _store(mock, "https://shop.example", V5, cart=True)
+        h = await fleet.check_store("https://shop.example", probe_cart=False)
+        posts = [c for c in mock.calls if c.request.method != "GET"]
+    assert h.reachable and h.sdk == "v5"
+    assert posts == [] and h.cart_api is False
+
+
+def test_field_study_summary_counts_only_paypal_stores_for_paypal_metrics():
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "field_study", Path(__file__).parents[1] / "scripts" / "field_study.py"
+    )
+    study = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(study)
+    base = {
+        "reachable": True,
+        "paypal": True,
+        "sdk": "v5",
+        "venmo": False,
+        "pay_later": True,
+        "catalog_feed": None,
+    }
+    stores = [
+        base,
+        {**base, "sdk": "v6", "venmo": True},
+        {**base, "paypal": False, "sdk": "none", "pay_later": False, "catalog_feed": "/products.json"},
+        {**base, "reachable": False},
+    ]
+    s = study.summarise(stores)
+    assert s["stores_reachable"] == 3 and s["paypal_seen_on_public_pages"] == 2
+    assert s["of_paypal_stores"] == {
+        "legacy_v5_sdk_pct": 50.0,
+        "v6_sdk_pct": 50.0,
+        "no_venmo_pct": 50.0,
+        "no_pay_later_messaging_pct": 0.0,
+    }
+    assert s["of_all_reachable_stores"]["catalog_feed_at_common_paths_pct"] == 33.3

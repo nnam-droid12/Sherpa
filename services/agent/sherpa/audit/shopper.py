@@ -74,6 +74,7 @@ class ShopperResult:
     blank_page: bool = False
     clicks_after_checkout: int | None = None
     error: str | None = None
+    infra_error: bool = False  # the cloud browser failed, not the store
     model_calls: int = 0
     seconds: float = 0.0
 
@@ -207,17 +208,23 @@ async def _screenshot(page: Page) -> bytes:
     return await page.screenshot(type="png", mask=mask, animations="disabled")
 
 
+class BrowserGone(RuntimeError):
+    """Every page in the cloud browser closed: an infrastructure failure, not the store's."""
+
+
 async def _active_screenshot(b: _Browser) -> bytes:
-    """Screenshot the active page; the PayPal popup closes itself after approval, so fall back to the store."""
-    if b.page.is_closed():
-        b.page = b.main
-    try:
-        return await _screenshot(b.page)
-    except Exception:
-        if b.page is b.main:
-            raise
-        b.page = b.main
-        return await _screenshot(b.page)
+    """Screenshot the active page; the PayPal popup closes itself after approval, so fall back to any open page."""
+    candidates = [b.page, b.main, *reversed(b.session.context.pages)]
+    for page in dict.fromkeys(candidates):
+        if page.is_closed():
+            continue
+        try:
+            shot = await _screenshot(page)
+        except Exception:
+            continue
+        b.page = page
+        return shot
+    raise BrowserGone("The cloud browser closed every page")
 
 
 async def _execute(
@@ -332,6 +339,12 @@ def _prune_screenshots(history: list[types.Content]) -> None:
                     p.function_response.parts = None
 
 
+def is_infra_error(exc: BaseException) -> bool:
+    """The cloud browser or its connection failed, as opposed to something the store did."""
+    name = type(exc).__name__
+    return isinstance(exc, BrowserGone) or name in {"TargetClosedError"} or "has been closed" in str(exc)
+
+
 async def run_shopper(
     store_url: str,
     device: Device,
@@ -359,6 +372,8 @@ async def run_shopper(
         # One click at a time needs little deliberation; LOW cuts per-step latency roughly tenfold.
         thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
     )
+    b: _Browser | None = None
+    session = None
     try:
         async with open_session(device, allowed, timeout_seconds=timeout_s + 120) as session:
             result.live_view_url = session.live_view_url
@@ -518,6 +533,12 @@ async def run_shopper(
     except Exception as exc:
         log.exception("shopper failed")
         result.error = f"{type(exc).__name__}: {exc}"
+        result.infra_error = is_infra_error(exc)
+        # Keep what was already seen: a payment may have completed before the browser went away.
+        if b is not None:
+            result.order_ids = list(b.order_ids)
+        if session is not None:
+            result.replay_url = result.replay_url or getattr(session, "replay_url", None)
 
     if paypal.configured:
         for order_id in reversed(result.order_ids):

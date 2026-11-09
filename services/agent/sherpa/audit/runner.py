@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import shutil
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -22,6 +23,18 @@ from sherpa.store.runs import RunStore
 log = logging.getLogger(__name__)
 
 HTML_PATHS = ("", "cart", "checkout")
+
+
+async def retry_browser_failures(
+    by_device: dict[str, ShopperResult | None],
+    rerun: Callable[[str], Awaitable[ShopperResult]],
+    emit: Callable[..., Awaitable[Any]],
+) -> None:
+    """A cloud-browser failure says nothing about the store, so that device gets exactly one more try."""
+    for d, r in list(by_device.items()):
+        if r is not None and r.infra_error and not r.payment_completed:
+            await emit("log", message=f"The {d} cloud browser disconnected; retrying the {d} shopper once")
+            by_device[d] = await rerun(d)
 
 
 async def fetch_html(store_url: str) -> str:
@@ -118,6 +131,11 @@ async def run_audit(
             await emit("warning", message=f"{d} shopper failed: {r}")
         else:
             by_device[d] = r
+    await retry_browser_failures(
+        by_device,
+        lambda d: run_shopper(store_url, d, emit, extra_hosts=extra_hosts, save_shot=save_shot),  # type: ignore[arg-type]
+        emit,
+    )
 
     probe_pay_later = any(
         p.get("pay_later_message") for r in by_device.values() if r for p in r.probes if "error" not in p

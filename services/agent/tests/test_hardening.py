@@ -68,7 +68,8 @@ async def test_screenshot_falls_back_to_store_when_paypal_popup_closed():
             return self.data
 
     main = FakePage(False, b"store")
-    b = SimpleNamespace(main=main, page=FakePage(True, b"popup"))
+    context = SimpleNamespace(pages=[main])
+    b = SimpleNamespace(main=main, page=FakePage(True, b"popup"), session=SimpleNamespace(context=context))
     assert await shopper._active_screenshot(b) == b"store"
     assert b.page is main
 

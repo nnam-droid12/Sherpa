@@ -25,13 +25,17 @@ AGENT_READY_TASK = """Make this store ready for AI shopping agents. Add, in the 
 1. A catalog feed at `GET /catalog.json` returning `{ "items": [...] }` built from the store's real product data, \
 each item with id, title, description, price {currency_code, value}, availability ("in_stock" or "preorder"), \
 image_url (absolute URL), url and variants (may be empty). Include extra product facts an agent needs (for example \
-serves / lead time) as additional fields.
+serves / lead time) as additional fields only when the store already has them.
+   Use ONLY products that already exist in this store's code or data, with their exact titles and prices. Never \
+invent products, titles, prices, descriptions or images, and never copy examples from these instructions. If the \
+store sells a single fixed item (for example a fixed order amount), publish exactly that one item at its real price, \
+titled from the store's own page.
 2. The PayPal Cart API v1 merchant endpoints exactly as specified in the reference below: `POST /merchant-cart`, \
 `GET /merchant-cart/{id}`, `PUT /merchant-cart/{id}` (full replace) and `POST /merchant-cart/{id}/checkout`, at those \
 exact paths (not under /api). Keep carts in an in-memory Map keyed by id. Price items only from the server-side catalog. \
 Validate every cart and return validation_issues in the documented shape, for example an unknown item_id \
-(INVENTORY_ISSUE), a missing shipping_address (SHIPPING_ERROR / MISSING_FIELD) and, for products that must be ordered \
-ahead, a missing or too-early DELIVERY_DATE_PREFERENCE checkout field (DATA_ERROR / MISSING_FIELD with \
+(INVENTORY_ISSUE), a missing shipping_address (SHIPPING_ERROR / MISSING_FIELD) and, only if the store already sells \
+products that must be ordered ahead, a missing or too-early DELIVERY_DATE_PREFERENCE checkout field (DATA_ERROR / MISSING_FIELD with \
 resolution_options [{"action": "PROVIDE_MISSING_FIELD"}]).
 3. Wire carts to PayPal Orders v2 on the sandbox: when a cart has items, create (or, on PUT, recreate) a PayPal order \
 for the server-computed total with `payment_source.paypal.experience_context` containing return_url \
@@ -51,6 +55,50 @@ PayPal Cart API v1 reference:
 
 def agent_ready_task() -> str:
     return AGENT_READY_TASK + cart_api_reference()
+
+
+MONEY_RE = re.compile(r"(?<![\d.])\d{1,6}\.\d{2}(?!\d)")
+NUMBER_RE = re.compile(r"(?<![\d.])\d{1,6}(?![\d.])")
+
+
+def money_values(text: str) -> set[float]:
+    return {
+        v for v in (float(m) for m in MONEY_RE.findall(text)) if v >= 1
+    }  # tolerances like 0.01 are not prices
+
+
+def invented_prices(original: str, items: list[dict[str, Any]]) -> list[str]:
+    """Catalog items whose price appears nowhere in the store's original code: a sign of invented products."""
+    known = money_values(original) | {float(n) for n in NUMBER_RE.findall(original)}
+    out = []
+    for item in items:
+        price = item.get("price")
+        raw = price.get("value") if isinstance(price, dict) else price
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if value not in known:
+            out.append(f"{item.get('title') or item.get('id')} (${value:.2f})")
+    return out
+
+
+def grounded_check(original: str) -> Callable[[Workspace], list[str]]:
+    """agent_ready_check plus a guard against prices that did not exist in the store before this step."""
+
+    def check(ws: Workspace) -> list[str]:
+        problems = agent_ready_check(ws)
+        corpus = "\n".join(sc.read_source_tree(ws.root).values())
+        new = sorted(money_values(corpus) - money_values(original))
+        if new:
+            problems.append(
+                "New prices appeared that are not in the store's original code ("
+                + ", ".join(f"{v:.2f}" for v in new[:6])
+                + "): use only the store's real products and prices, never invent catalog items."
+            )
+        return problems
+
+    return check
 
 
 def agent_ready_check(ws: Workspace) -> list[str]:

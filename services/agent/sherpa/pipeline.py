@@ -12,7 +12,8 @@ from typing import Any
 
 import httpx
 
-from sherpa.agentready.spec import agent_ready_check, agent_ready_task, run_contract_tests
+from sherpa.agentready.spec import agent_ready_task, grounded_check, invented_prices, run_contract_tests
+from sherpa.audit import static_checks as sc
 from sherpa.audit.runner import run_audit
 from sherpa.buyer.agent import next_weekday, run_buyer
 from sherpa.config import get_settings
@@ -282,6 +283,8 @@ async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any
     slug = parse_repo(repo)[1].removeprefix("sherpa-demo-")
     await emit("log", message="Adding a catalog feed and PayPal Cart API v1 endpoints")
     root = await clone(repo, fix["branch"])
+    # What the store already sells, before this step: the catalog must be built from it, never invented.
+    original = "\n".join(sc.read_source_tree(root).values())
     try:
         ws = Workspace(root)
         outcome = await run_fixer(
@@ -290,7 +293,7 @@ async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any
             emit,
             store_type=run.get("store_type", "auto"),
             task=agent_ready_task(),
-            checker=agent_ready_check,
+            checker=grounded_check(original),
         )
         if not ws.changed or not outcome.build_ok:
             raise RuntimeError("The agent-ready changes did not build; nothing was pushed.")
@@ -322,6 +325,12 @@ async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any
     except Exception as exc:
         await emit("warning", message=f"Catalog feed unreadable: {exc}")
     await emit("catalog", url=f"{preview_url}/catalog.json", count=len(feed), items=feed[:6])
+    invented = invented_prices(original, feed)
+    if invented:
+        await emit(
+            "warning",
+            message="Catalog items with prices not found in the store's code: " + "; ".join(invented),
+        )
     shelf = await shelf_job(feed, emit)
     item_id = feed[0]["id"] if feed else ""
     date = next_weekday(5, min_days=7).isoformat()
@@ -341,6 +350,7 @@ async def agent_ready_job(store: RunStore, run: dict[str, Any]) -> dict[str, Any
     return {
         "agent_ready": {
             "preview_url": preview_url,
+            "invented_products": invented,
             "sha": sha,
             "diff": diff[:MAX_DIFF],
             "files_changed": outcome.files_changed,

@@ -382,6 +382,31 @@ def _prune_screenshots(history: list[types.Content]) -> None:
                     p.function_response.parts = None
 
 
+CAPTURE_WAIT_S = 20
+
+
+async def confirm_payment(
+    paypal: PayPalClient, order_ids: list[str], wait_s: float = CAPTURE_WAIT_S, poll_s: float = 2.0
+) -> dict[str, str] | None:
+    """The newest order PayPal reports as paid. An APPROVED order is polled for a while: after the PayPal window
+    closes, the store's own capture request can still be in flight."""
+    deadline = time.monotonic() + wait_s
+    pending = list(reversed(order_ids))
+    while pending:
+        still_approved = []
+        for order_id in pending:
+            order = await paypal.get_order(order_id)
+            if order_completed(order):
+                return {"id": order_id, "status": order["status"]}
+            if order and order.get("status") == "APPROVED":
+                still_approved.append(order_id)
+        if not still_approved or time.monotonic() >= deadline:
+            return None
+        pending = still_approved
+        await asyncio.sleep(poll_s)
+    return None
+
+
 def is_infra_error(exc: BaseException) -> bool:
     """The cloud browser or its connection failed, as opposed to something the store did."""
     text = str(exc)
@@ -589,12 +614,10 @@ async def run_shopper(
             result.replay_url = result.replay_url or getattr(session, "replay_url", None)
 
     if paypal.configured:
-        for order_id in reversed(result.order_ids):
-            order = await paypal.get_order(order_id)
-            if order_completed(order):
-                result.payment_completed = True
-                result.completed_order = {"id": order_id, "status": order["status"]}
-                break
+        completed = await confirm_payment(paypal, result.order_ids)
+        if completed:
+            result.payment_completed = True
+            result.completed_order = completed
     result.seconds = round(time.monotonic() - started, 1)
     await emit(
         "shopper_done",

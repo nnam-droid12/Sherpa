@@ -97,3 +97,33 @@ def test_typed_dates_become_iso(typed, iso):
 @pytest.mark.parametrize("typed", ["Alex Rivera", "500 Market St", "94105", "13/45/2026"])
 def test_non_dates_are_left_alone(typed):
     assert shopper.to_iso_date(typed) is None
+
+
+class SlowCapturePayPal:
+    """APPROVED for the first checks, then COMPLETED, like a store whose capture lands after the popup closes."""
+
+    def __init__(self, approved_checks):
+        self.left = approved_checks
+
+    async def get_order(self, order_id):
+        if self.left > 0:
+            self.left -= 1
+            return {"id": order_id, "status": "APPROVED"}
+        return {
+            "id": order_id,
+            "status": "COMPLETED",
+            "purchase_units": [{"payments": {"captures": [{"status": "COMPLETED"}]}}],
+        }
+
+
+@pytest.mark.asyncio
+async def test_a_capture_that_lands_late_is_still_confirmed():
+    done = await shopper.confirm_payment(SlowCapturePayPal(2), ["ORDER1"], wait_s=5, poll_s=0.01)
+    assert done == {"id": "ORDER1", "status": "COMPLETED"}
+
+
+@pytest.mark.asyncio
+async def test_an_order_that_never_completes_is_not_confirmed():
+    assert (
+        await shopper.confirm_payment(SlowCapturePayPal(10_000), ["ORDER1"], wait_s=0.05, poll_s=0.01) is None
+    )

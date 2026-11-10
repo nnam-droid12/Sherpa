@@ -71,8 +71,9 @@ def _order_amount(order: dict[str, Any] | None) -> str | None:
 async def price_tamper(
     c: httpx.AsyncClient, base: str, product: dict[str, Any] | None, paypal: PayPalClient
 ) -> dict:
-    if not product:
-        return {"verdict": UNKNOWN, "detail": "No product found to put in the cart."}
+    # A store without a product list (a single-item or fixed-amount checkout) still gets the tampered request:
+    # a server that sets its own amount ignores the placeholder, and a vulnerable one charges $1.00.
+    product = product or {"id": "sherpa-probe-item", "title": None, "price": None}
     line = {"id": product["id"], "qty": 1, "quantity": 1, "price": FAKE_PRICE, "unit_price": FAKE_PRICE}
     payload = {"items": [line], "total": FAKE_PRICE, "amount": FAKE_PRICE, "currency": "USD"}
     for path in ORDER_PATHS:

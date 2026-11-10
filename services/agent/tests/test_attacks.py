@@ -108,3 +108,13 @@ def test_pr_comment_lists_attack_results():
     text = scorecard_comment({"total": 15}, {"total": 100}, "https://pr-1.example", None, rows)
     assert "### Attack replay" in text
     assert "| Price tampering | PayPal order A was created for $1.00" in text
+
+
+@pytest.mark.asyncio
+async def test_price_tampering_runs_on_a_store_without_a_product_list():
+    with respx.mock(assert_all_called=False) as mock:
+        mock.post(f"{AFTER}/api/orders").respond(201, json={"id": "SAMPLE"})
+        mock.route(host="after.example").respond(404)
+        async with httpx.AsyncClient() as c:
+            result = await attacks.price_tamper(c, AFTER + "/", None, FakePayPal({"SAMPLE": "100.00"}))
+    assert result["verdict"] == "blocked" and result["amount"] == "100.00"

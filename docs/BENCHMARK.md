@@ -61,6 +61,7 @@ Every run that reached Verify, as stored on the live system. Scores from differe
 | `c0f8218ae7c0` (Verify re-run) | Lumen Bakehouse | 14 → **100** | COMPLETED (desktop and mobile) | First phone checkout through Lumen's delivery-date field, after Sherpa learned to set native date inputs. AI buyer order `COMPLETED`, Cart API 8/8 |
 | `c0f8218ae7c0` (first Verify) | Lumen Bakehouse | 14 → 65 / 75 | COMPLETED (desktop) | The phone shopper ran out of steps on the native date picker (it typed `11202026`). Fixed: Sherpa sets date inputs directly, digits-only dates included |
 | `06eebdce06ea` | Lumen Bakehouse | 18 → 82 | none | Recorded before the KERNEL key and browser fixes |
+| `61387375ff4d` | **PayPal's official sample** (code we didn't write) | 71 → 82 | COMPLETED (desktop) | Phone: PayPal's v6 "Click to Continue" popup fallback never opened, so the order was created but not captured; reported as `MOBILE_PAYMENT_FAILED`. Catalog grounded to the one real $100.00 item; AI buyer order `COMPLETED`; Cart API 8/8 |
 
 A second Verify re-run on 9 November hit a different infrastructure fault: a rebuilt image was missing `libatomic1`, so Playwright's driver couldn't start, and that run scored 65 with no shopper able to open a browser. The image now installs it, and the build runs `playwright --version`, so a broken image fails the build instead of a live run. Driver crashes also count as infrastructure errors (retried, then marked "not tested" instead of "failed").
 

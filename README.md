@@ -36,6 +36,25 @@ Agentic commerce has the same bottleneck. Before an AI agent can buy from a stor
 - **Agent Shelf.** After Agent-ready, Sherpa shows what a shopper's AI agent finds on the open web for the store's own products. Gemini writes the search a shopper's agent would send, [Channel3](https://trychannel3.com) returns live products and in-stock retailer offers, Gemini keeps only real alternatives, and the console plots the store's price against the market (min, median, max). When nothing comparable exists, as with Lumen's cakes, it says so, rather than padding the shelf with lookalikes.
 - **Fleet scan** (`/fleet`). Platforms and agencies paste up to 25 store URLs and get them ranked by checkout health, worst first, in an AG Grid table: PayPal SDK version, Venmo, Pay Later, catalog feed and Cart API. It uses no browsers or model calls, finishes in seconds, refuses private and metadata addresses, and each row opens a deep audit.
 
+### On code we didn't write: PayPal's own sample
+
+Sherpa also ran end to end on **PayPal's official JS SDK standard-integration sample** (Apache-2.0, packaged unchanged except for a 9-line serving block in [`sherpa-demo-paypal-sample`](https://github.com/nnam-droid12/sherpa-demo-paypal-sample)):
+
+- **Audit: 71/100**, with accurate findings and no false alarms. It flagged the legacy v5 SDK, the missing webhook, no `PayPal-Request-Id` and `PENDING` not handled. It gave credit for the declined-card recovery, Pay Later messaging and error messages the sample already has.
+- **Fix:** [PR #1](https://github.com/nnam-droid12/sherpa-demo-paypal-sample/pull/1) moves it to SDK v6 with a verified, deduplicated webhook, safe retries and pending handling (server-side correctness 20/20).
+- **Verify: 71 → 82.** The desktop sandbox payment is `COMPLETED`. Price tampering was already blocked (the sample sets $100.00 on the server), and the forged webhook went from "no endpoint" to "rejected". The phone shopper's v6 checkout created an order that was never captured: PayPal showed its "Click to Continue" popup fallback, but the popup never opened. Verify reports this as `MOBILE_PAYMENT_FAILED` instead of passing the PR.
+- **Agent-ready:** the catalog holds exactly the sample's one real item at $100.00, Cart API contract tests pass 8/8, and the AI buyer's order is `COMPLETED`.
+
+Running it on real code exposed and fixed six gaps in Sherpa:
+- the official server SDK wasn't recognised
+- v5 Pay Later messaging wasn't credited
+- plain error messages weren't recognised
+- a store with only one item confused the shopper
+- price tampering needed a product list
+- the agent-ready step invented catalog products
+
+That last one is now blocked: every catalog item's id, title and price must exist in the store's original code.
+
 ### Proof, not promises
 
 - **Attack replay.** Verify tries two real attacks on the store, before and after the fix, in the PayPal sandbox. It sends a $1.00 order for a $349 tent through the store's own order endpoint and reads the amount back from the Orders API. It also sends a forged `PAYMENT.CAPTURE.COMPLETED` webhook. On Ember & Oak: before the fix, PayPal created the order for **$1.00** and the forgery was accepted (HTTP 200). After it, the order was **$349.00** and the forgery was rejected (HTTP 400). Only stores Sherpa can prove are sandbox are attacked, and attack orders are never captured.

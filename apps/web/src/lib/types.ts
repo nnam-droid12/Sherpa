@@ -73,6 +73,8 @@ export type AgentReady = {
   endpoints: { method: string; path: string; ok: boolean; detail?: string }[];
   transcript: { role: string; text: string; tool?: string }[];
   order: { id: string; status: string } | null;
+  /** Catalog items not found in the store's original code (possible invented products). */
+  invented_products?: string[];
 };
 
 export type ShelfProduct = {

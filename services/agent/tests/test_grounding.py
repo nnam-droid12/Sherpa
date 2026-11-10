@@ -47,3 +47,23 @@ def test_grounded_check_rejects_new_prices_but_not_tolerances(tmp_path):
     assert not any("New prices" in p for p in check(Workspace(tmp_path)))
     (tmp_path / "catalog.js").write_text('export const items = [{ id: "cake", price: "78.00" }];')
     assert any("78.00" in p for p in check(Workspace(tmp_path)))
+
+
+def test_a_bare_number_elsewhere_in_the_code_is_not_a_known_price():
+    # "50" appears in ordinary code (timeouts, sizes); it must not make an invented $50 item look real.
+    original = SAMPLE_SERVER + "\nsetTimeout(retry, 50); const width = 50;"
+    feed = [{"id": "item-2", "title": "Sample Item 2", "price": {"value": "50.00"}}]
+    assert invented_prices(original, feed) == ["Sample Item 2 ($50.00)"]
+
+
+def test_whole_number_prices_next_to_a_price_key_are_known():
+    assert invented_prices('{ "id": "a", "price": 50 }', [{"id": "a", "price": 50}]) == []
+
+
+def test_an_invented_item_at_a_real_price_is_still_flagged():
+    sample = SAMPLE_SERVER + '\nbody: JSON.stringify({ cart: [{ id: "YOUR_PRODUCT_ID", quantity: "1" }] })'
+    feed = [
+        {"id": "YOUR_PRODUCT_ID", "title": "Sample Item", "price": {"value": "100.00"}},
+        {"id": "item-1", "title": "Sample Item 1", "price": {"value": "100.00"}},
+    ]
+    assert invented_prices(sample, feed) == ["Sample Item 1 ($100.00)"]

@@ -58,18 +58,23 @@ def agent_ready_task() -> str:
 
 
 MONEY_RE = re.compile(r"(?<![\d.])\d{1,6}\.\d{2}(?!\d)")
-NUMBER_RE = re.compile(r"(?<![\d.])\d{1,6}(?![\d.])")
+# A whole number counts as a price only right after a price-like key: `price: 50`, `"amount": "50"`.
+PRICE_KEY_RE = re.compile(
+    r"""(?i)\b(?:price|amount|value|cost|total)\w*["']?\s*[:=]\s*["']?(\d{1,6}(?:\.\d{1,2})?)\b"""
+)
 
 
 def money_values(text: str) -> set[float]:
-    return {
-        v for v in (float(m) for m in MONEY_RE.findall(text)) if v >= 1
-    }  # tolerances like 0.01 are not prices
+    """Price-like values in code; tolerances such as 0.01 are not prices."""
+    found = [float(m) for m in MONEY_RE.findall(text)] + [float(m) for m in PRICE_KEY_RE.findall(text)]
+    return {v for v in found if v >= 1}
 
 
 def invented_prices(original: str, items: list[dict[str, Any]]) -> list[str]:
-    """Catalog items whose price appears nowhere in the store's original code: a sign of invented products."""
-    known = money_values(original) | {float(n) for n in NUMBER_RE.findall(original)}
+    """Catalog items that are not in the store's original code: a price it never charged, or an id and title it
+    never mentions. Either is a sign of an invented product."""
+    known = money_values(original)
+    text = original.casefold()
     out = []
     for item in items:
         price = item.get("price")
@@ -77,9 +82,12 @@ def invented_prices(original: str, items: list[dict[str, Any]]) -> list[str]:
         try:
             value = float(raw)
         except (TypeError, ValueError):
-            continue
-        if value not in known:
-            out.append(f"{item.get('title') or item.get('id')} (${value:.2f})")
+            value = None
+        names = [str(item.get(k) or "").strip().casefold() for k in ("id", "title")]
+        mentioned = any(n and n in text for n in names)
+        if (value is not None and value not in known) or not mentioned:
+            label = item.get("title") or item.get("id")
+            out.append(f"{label} (${value:.2f})" if value is not None else str(label))
     return out
 
 

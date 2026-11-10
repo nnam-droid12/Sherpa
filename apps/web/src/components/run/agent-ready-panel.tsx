@@ -205,6 +205,11 @@ export function AgentReadyPanel({ run, events, state }: { run: Run | null; event
           </Step>
           <Step n={2} title="Catalog feed" sub="What AI shopping agents now see when they discover the store.">
             <Catalog event={catalog} />
+            {!!run?.agent_ready?.invented_products?.length && (
+              <p role="alert" className="mt-3 rounded-xl border border-bad/40 bg-bad/10 px-4 py-3 text-sm text-bad">
+                Not in the store&apos;s original code, so possibly invented: {run.agent_ready.invented_products.join(", ")}. Review before merging.
+              </p>
+            )}
           </Step>
           <Step n={3} title="Agent Shelf" sub="What a shopper's AI agent finds on the open web for the same products, and how this store's prices compare.">
             <AgentShelf run={run} events={events} running={running} />

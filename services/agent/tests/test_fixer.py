@@ -143,3 +143,19 @@ async def test_file_events_stream_content_and_diffs(ember):
     assert edit["diff"].startswith("diff --git a/server.js b/server.js")
     assert "+const PORT = Number(process.env.PORT) || 8080;" in edit["diff"]
     assert create["action"] == "create" and "+module.exports = 1;" in create["diff"]
+
+
+def test_self_check_requires_resuming_payments_that_left_the_page(tmp_path):
+    from sherpa.fixer.agent import self_check
+    from sherpa.fixer.tools import Workspace
+
+    page = '<script async src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>'
+    (tmp_path / "package.json").write_text("{}")
+    (tmp_path / "index.html").write_text(
+        page + "<script>session.start({ presentationMode: 'auto' }, createOrder());</script>"
+    )
+    assert any("hasReturned" in p for p in self_check(Workspace(tmp_path)))
+    (tmp_path / "index.html").write_text(
+        page + "<script>if (session.hasReturned()) { await session.resume(); } else { render(); }</script>"
+    )
+    assert not any("hasReturned" in p for p in self_check(Workspace(tmp_path)))

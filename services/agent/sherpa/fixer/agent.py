@@ -6,6 +6,7 @@ import asyncio
 import difflib
 import json
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -65,6 +66,10 @@ in an element with role="alert" and a "Try again" path; never blank the page.
 9. Make PayPal calls retry-safe: send a unique `PayPal-Request-Id` header (crypto.randomUUID()) on every POST to /v2/checkout/orders and /v2/checkout/orders/{id}/capture.
 10. Treat a capture whose status is "PENDING" as not yet paid: only mark the order paid for a "COMPLETED" capture and tell the buyer a PENDING payment is being reviewed.
 11. Deduplicate webhooks: keep a `processedEvents` Set of event ids, and when `processedEvents.has(event.id)` return 200 without processing the event again.
+12. Finish payments that leave the page (phones often do): on every page that renders PayPal or Venmo buttons, \
+create the payment session at page load and, if `session.hasReturned()` is true, `await session.resume()` (the \
+original onApprove then runs) instead of rendering the buttons again. If `session.start` fails with \
+ERR_DEV_UNABLE_TO_OPEN_POPUP, retry it with `{ presentationMode: "modal" }`.
 Do not add a catalog feed or Cart API endpoints in this change; a separate agent-ready step does that."""
 
 
@@ -157,6 +162,11 @@ def self_check(ws: Workspace) -> list[str]:
             problems.append('A "PENDING" capture status is not distinguished from "COMPLETED".')
     if server.webhook_signature_verified and not server.webhook_deduped:
         problems.append("The webhook handler does not skip event ids it has already processed.")
+    if sdk.version == "v6" and not re.search(r"\.hasReturned\(\)[\s\S]{0,400}\.resume\(\)", corpus):
+        problems.append(
+            "Payments that leave the page are never finished: call session.hasReturned() on load and "
+            "await session.resume() when it is true."
+        )
     return problems
 
 

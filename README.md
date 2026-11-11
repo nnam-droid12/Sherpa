@@ -145,25 +145,54 @@ Public runs are rate limited per visitor to protect cloud credits.
 
 ## Run it yourself
 
-**Prerequisites:** Python 3.12, Node 22, the Google Cloud SDK, a GitHub account, a PayPal developer account and a KERNEL account.
+The public demo caps Gemini to protect our cloud credits (Fix and Agent-ready are paused there). Running Sherpa on your own Google Cloud project with your own keys lifts every limit. It takes about 30 minutes.
 
-1. **PayPal sandbox:** in the [developer dashboard](https://developer.paypal.com/dashboard/accounts), create a **US business** sandbox account and a **US personal** sandbox account. Then go to **Apps & Credentials → Create App (Sandbox)** and link it to the US business account.
-2. **KERNEL:** create an API key at https://dashboard.onkernel.com.
-3. **Google Cloud:** enable Vertex AI, Cloud Run, Cloud Build, Artifact Registry, Secret Manager and Firestore. Then run `gcloud auth application-default login`. No Gemini API key is needed.
-4. **GitHub:** create a fine-grained token limited to your store repos, with read/write on Contents, Pull requests and Issues.
-5. Copy `.env.example` to `.env` and fill it in.
-6. Run it locally:
-   ```bash
-   python -m venv .venv && .venv/bin/pip install -e "services/agent[dev]"
-   cd services/agent && ../../.venv/bin/uvicorn sherpa.main:app --port 8080
-   cd apps/web && npm install && SHERPA_AGENT_URL=http://localhost:8080 npm run dev
-   ```
-7. Deploy to Cloud Run:
-   ```bash
-   infra/secrets.sh        # .env -> Secret Manager (values are never printed)
-   infra/deploy.sh all     # stores, agent, console
-   infra/reset-demo.sh     # reset the demo repos to their flawed baseline
-   ```
+**Prerequisites:** Python 3.12, Node 22, ffmpeg, the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), and accounts with GitHub, PayPal Developer, KERNEL and (optionally) Channel3.
+
+### 1. Get your keys
+
+| Service | What to do | `.env` values |
+|---|---|---|
+| **Gemini on Vertex AI (your own project)** | Create or pick a Google Cloud project with billing on. Enable **Vertex AI**, **Firestore**, **Cloud Run**, **Cloud Build**, **Artifact Registry**, **Cloud Storage** and **Secret Manager**. Create a Firestore database (Native mode). Then sign in with `gcloud auth application-default login`. There is **no Gemini API key**: Sherpa uses Application Default Credentials. | `GOOGLE_CLOUD_PROJECT` (your project id), `GOOGLE_CLOUD_LOCATION=global`, `GOOGLE_GENAI_USE_VERTEXAI=true`, `SHERPA_GEMINI_MODEL`, `SHERPA_COMPUTER_USE_MODEL` (any Gemini model your project can use with computer use and function calling) |
+| **PayPal sandbox** | In the [developer dashboard](https://developer.paypal.com/dashboard/accounts), create a **US business** and a **US personal** sandbox account. Under **Apps & Credentials → Create App (Sandbox)**, link the app to the business account. In the app, add a webhook (any https URL is fine for local use) and copy its id. | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, and the personal account's email and password as `PAYPAL_SANDBOX_BUYER_EMAIL` / `PAYPAL_SANDBOX_BUYER_PASSWORD`. Keep `PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com`: Sherpa refuses live PayPal. |
+| **KERNEL cloud browsers** | Create an API key at https://dashboard.onkernel.com. KERNEL keys expire after a month, so make a new one if audits stop opening browsers. | `KERNEL_API_KEY` |
+| **GitHub** | Fork [`sherpa-demo-ember-oak`](https://github.com/nnam-droid12/sherpa-demo-ember-oak) and [`sherpa-demo-lumen-bakehouse`](https://github.com/nnam-droid12/sherpa-demo-lumen-bakehouse) (or use your own store repo). Create a **fine-grained token** for those repos with **read and write** on **Contents**, **Pull requests** and **Issues**. | `GITHUB_TOKEN`, and `DEMO_REPO_OWNER` (your GitHub username) |
+| **Channel3** (optional, for Agent Shelf) | Create an API key at https://trychannel3.com. Without it, Agent Shelf is simply skipped. | `CHANNEL3_API_KEY` |
+| **Sherpa itself** | Pick any long random string. The console sends it to the agent. | `SHERPA_API_KEY` |
+
+Optional settings:
+- `SHERPA_DEMO_MODE=false` turns off all public-demo limits, for your own use.
+- With demo mode on, `SHERPA_DAILY_CODING_RUNS` and `SHERPA_DAILY_AUDIT_RUNS` set the daily caps.
+- `SHERPA_ARTIFACTS_BUCKET` is a Cloud Storage bucket for screenshots.
+- `DEMO_EMBER_OAK_URL` and `DEMO_LUMEN_URL` are your deployed demo stores.
+
+### 2. Configure
+
+```bash
+cp .env.example .env     # then fill in the values above; .env is git-ignored and never committed
+```
+
+### 3. Run locally
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -e "services/agent[dev]"          # Windows: .venv\Scripts\pip
+cd services/agent && ../../.venv/bin/uvicorn sherpa.main:app --port 8080
+# in a second terminal
+cd apps/web && npm install && SHERPA_AGENT_URL=http://localhost:8080 npm run dev
+```
+
+Open http://localhost:3000, pick a demo store and press **⚡ Full autopilot**. Checks: `cd services/agent && ../../.venv/bin/pytest` (107 tests) and `cd apps/web && npx tsc --noEmit`.
+
+### 4. Deploy to your own Cloud Run (optional)
+
+```bash
+infra/secrets.sh        # copies .env into Secret Manager; values are never printed
+infra/deploy.sh all     # demo stores, agent and console
+infra/reset-demo.sh     # resets the demo repos to their flawed baseline
+```
+
+**Costs to expect:** a full Autopilot run uses roughly $1–4 of Gemini (the coding agent reads the whole store each step), plus a few minutes of KERNEL browsers. An audit alone costs a few cents. Fleet scan and the MCP endpoint use no Gemini at all.
 
 ## Limitations and honesty notes
 

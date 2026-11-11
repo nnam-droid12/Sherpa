@@ -171,3 +171,6 @@ export const CATEGORY_LABELS: Record<string, string> = {
 export function artifactUrl(id?: string | null) {
   return id ? `/api/agent/artifacts/${id}` : undefined;
 }
+
+export type DemoLimits = { demo: boolean; coding_runs_per_day: number | null; audit_runs_per_day: number | null };
+export type AgentConfig = { model: string; paypal: string; limits?: DemoLimits };

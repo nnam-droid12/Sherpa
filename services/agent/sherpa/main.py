@@ -62,6 +62,12 @@ def public_config(s: Settings = Depends(get_settings)) -> dict:
         "computer_use_model": s.computer_use_model,
         "location": s.gcp_location,
         "paypal": "sandbox",
+        # Shown to judges on the site, so the public demo's cost limits are never a surprise.
+        "limits": {
+            "demo": s.demo_mode,
+            "coding_runs_per_day": s.daily_coding_runs if s.demo_mode else None,
+            "audit_runs_per_day": s.daily_audit_runs if s.demo_mode else None,
+        },
     }
 
 

@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     public_url: str = Field(default="http://localhost:8080", alias="SHERPA_PUBLIC_URL")
     demo_mode: bool = Field(default=True, alias="SHERPA_DEMO_MODE")
     runs_per_hour: int = Field(default=6, alias="SHERPA_RUNS_PER_HOUR")
+    # Public demo caps per day, in total, to protect cloud credits. Fix and Agent-ready are the Gemini-heavy
+    # stages (0 = paused; judges watch the finished runs); audits use far less.
+    daily_coding_runs: int = Field(default=0, alias="SHERPA_DAILY_CODING_RUNS")
+    daily_audit_runs: int = Field(default=3, alias="SHERPA_DAILY_AUDIT_RUNS")
 
 
 class LiveModeError(RuntimeError):

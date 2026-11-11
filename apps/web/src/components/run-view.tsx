@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { downloadReport } from "@/lib/report";
-import type { Run, RunEvent } from "@/lib/types";
+import type { DemoLimits, Run, RunEvent } from "@/lib/types";
 import { useRun } from "@/lib/use-run";
 import { CategoryBars } from "./category-bars";
 import { DiffView } from "./diff-view";
@@ -10,6 +10,7 @@ import { FindingCard } from "./finding-card";
 import { FixWorkspace } from "./fix-workspace";
 import { LiveView } from "./live-view";
 import { AgentReadyPanel } from "./run/agent-ready-panel";
+import { codingPaused, DemoLimitsNotice } from "./demo-limits";
 import { IncompleteNote } from "./run/incomplete-note";
 import { RevenueAtRisk } from "./run/revenue-at-risk";
 import { MissionBar, stageState, type StageState } from "./run/mission-bar";
@@ -88,7 +89,7 @@ const FIX_PREVIEW = [
   ["Safer payments", "Server-side amounts, verified webhook signatures, graceful errors."],
 ];
 
-export function RunView({ runId, initial }: { runId: string; initial: Run | null }) {
+export function RunView({ runId, initial, limits }: { runId: string; initial: Run | null; limits?: DemoLimits | null }) {
   const { run, events, connected, action } = useRun(runId, initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -118,6 +119,7 @@ export function RunView({ runId, initial }: { runId: string; initial: Run | null
   return (
     <div className="grid gap-6">
       <MissionBar run={run} busy={busy} onAction={go} />
+      {codingPaused(limits) && !run?.agent_ready && <DemoLimitsNotice limits={limits} compact />}
 
       <header className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
         <div className="min-w-0">

@@ -34,6 +34,7 @@ class RunStore:
         self._runs: dict[str, dict[str, Any]] = {}
         self._events: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self._subscribers: dict[str, set[asyncio.Queue]] = defaultdict(set)
+        self._quota: dict[str, int] = {}
 
     # --- runs -------------------------------------------------------------
     async def create_run(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -155,6 +156,36 @@ class RunStore:
 
 
 _store: RunStore | None = None
+
+
+async def take_daily_quota(store: RunStore, key: str, limit: int) -> bool:
+    """Count one use of `key` today (UTC). Returns False, without counting, once `limit` is reached.
+
+    Kept in Firestore inside a transaction so the cap holds across instances and restarts.
+    """
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    doc_id = f"{key}-{day}"
+    if not store._db:
+        used = store._quota.get(doc_id, 0)
+        if used >= limit:
+            return False
+        store._quota[doc_id] = used + 1
+        return True
+
+    from google.cloud import firestore
+
+    ref = store._db.collection("quota").document(doc_id)
+
+    @firestore.async_transactional
+    async def take(tx) -> bool:
+        snap = await ref.get(transaction=tx)
+        used = (snap.to_dict() or {}).get("used", 0) if snap.exists else 0
+        if used >= limit:
+            return False
+        tx.set(ref, {"used": used + 1, "key": key, "day": day, "limit": limit}, merge=True)
+        return True
+
+    return await take(store._db.transaction())
 
 
 def get_store() -> RunStore:

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DemoLauncher } from "@/components/demo-launcher";
+import { codingPaused, DemoLimitsNotice } from "@/components/demo-limits";
 import { NewRunForm } from "@/components/new-run-form";
 import { agentGet } from "@/lib/agent";
 import { scoreTone } from "@/lib/score";
-import type { DemoStore, Run } from "@/lib/types";
+import type { AgentConfig, DemoStore, Run } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Dashboard · Sherpa" };
@@ -32,9 +33,10 @@ function status(run: Run) {
 }
 
 export default async function Dashboard() {
-  const [demos, runs] = await Promise.all([
+  const [demos, runs, config] = await Promise.all([
     agentGet<DemoStore[]>("demo-stores"),
     agentGet<Run[]>("runs?limit=30"),
+    agentGet<AgentConfig>("config"),
   ]);
   const all = runs ?? [];
   const audited = all.filter((r) => r.audit);
@@ -58,6 +60,7 @@ export default async function Dashboard() {
           page.
         </p>
       </header>
+      <DemoLimitsNotice limits={config?.limits} />
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Activity">
         <Stat label="Runs" value={String(all.length)} hint="most recent 30" />
@@ -81,7 +84,7 @@ export default async function Dashboard() {
             </p>
           </div>
         </div>
-        <DemoLauncher demos={demos ?? []} />
+        <DemoLauncher demos={demos ?? []} autopilot={!codingPaused(config?.limits)} />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">

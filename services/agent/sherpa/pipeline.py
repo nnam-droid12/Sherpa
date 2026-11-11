@@ -23,7 +23,7 @@ from sherpa.fixer.pr import pr_body, scorecard_comment
 from sherpa.fixer.tools import Workspace
 from sherpa.gitrepo import clone, parse_repo
 from sherpa.shelf import build_shelf
-from sherpa.store.runs import RunStore
+from sherpa.store.runs import RunStore, take_daily_quota
 from sherpa.verify.attacks import replay as attack_replay
 from sherpa.verify.preview import deploy_preview
 
@@ -72,6 +72,21 @@ async def keep_instance_busy(work: asyncio.Task) -> None:
                 await asyncio.sleep(5)
 
 
+CODING_STAGES = {"fix", "agent_ready"}
+FINISHED_RUNS = "Open a finished run from the dashboard to see every stage, recorded from real runs."
+
+
+async def use_quota(store: RunStore, key: str, limit: int, what: str) -> None:
+    """Public demo caps, so judges can't run up the cloud bill. Raises with a plain explanation when used up."""
+    if limit <= 0:
+        raise RuntimeError(f"{what} are paused on the public demo to keep cloud costs down. {FINISHED_RUNS}")
+    if not await take_daily_quota(store, key, limit):
+        raise RuntimeError(
+            f"{what} have reached today's demo limit of {limit}, to keep cloud costs down. {FINISHED_RUNS} "
+            "The limit resets at midnight UTC."
+        )
+
+
 def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[dict[str, Any]]]) -> None:
     """Run a stage in the background; failures are recorded on the run instead of being lost."""
 
@@ -89,6 +104,16 @@ def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[
                 work.cancel()
                 return
 
+    async def guarded() -> dict[str, Any]:
+        # Fix and Agent-ready are the Gemini-heavy stages, so the public demo caps them per day.
+        settings = get_settings()
+        if settings.demo_mode:
+            if stage in CODING_STAGES:
+                await use_quota(store, "coding-runs", settings.daily_coding_runs, "Fix and Agent-ready")
+            elif stage == "audit":
+                await use_quota(store, "audit-runs", settings.daily_audit_runs, "Live audits")
+        return await job()
+
     async def wrapper() -> None:
         await store.update_run(
             run_id,
@@ -99,7 +124,7 @@ def spawn(store: RunStore, run_id: str, stage: str, job: Callable[[], Awaitable[
             heartbeat=time.time(),
         )
         started = time.monotonic()
-        work = asyncio.create_task(job())
+        work = asyncio.create_task(guarded())
         watcher = asyncio.create_task(watch_for_stop(work))
         holder = asyncio.create_task(keep_instance_busy(work))
         try:

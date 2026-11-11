@@ -7,7 +7,7 @@ import type { DemoStore, Run } from "@/lib/types";
 
 const FLAWS: Record<string, number> = { "ember-oak": 9, "lumen-bakehouse": 7 };
 
-export function DemoLauncher({ demos }: { demos: DemoStore[] }) {
+export function DemoLauncher({ demos, autopilot = true }: { demos: DemoStore[]; autopilot?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -69,6 +69,7 @@ export function DemoLauncher({ demos }: { demos: DemoStore[] }) {
                 >
                   {busy === d.id ? "Starting…" : "Run live audit"}
                 </button>
+                {autopilot && (
                 <button
                   onClick={() => start(d, true)}
                   disabled={busy !== null}
@@ -77,6 +78,7 @@ export function DemoLauncher({ demos }: { demos: DemoStore[] }) {
                 >
                   {busy === `${d.id}:auto` ? "Starting…" : "⚡ Full autopilot"}
                 </button>
+                )}
                 {d.recent_run_id && (
                   <Link
                     href={`/runs/${d.recent_run_id}`}
